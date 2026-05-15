@@ -4,7 +4,11 @@
       "Bash(npm --version)",
       "Bash(npm install *)",
       "Bash(npx drizzle-kit *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "WebFetch(domain:api.anthropic.com)",
+      "Bash(mkdir -p extracted)",
+      "Bash(tar -xzf webfetch-1778806767027-il9isb.bin -C extracted/)",
+      "Bash(npx next *)"
     ]
   }
 }

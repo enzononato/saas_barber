@@ -108,7 +108,7 @@ src/
 
 ## Contexto Rápido do Negócio
 
-- **Cliente:** Santos Studios Barbearia (Juazeiro, CE)
+- **Cliente:** Santos Studios Barbearia (Juazeiro, BA)
 - **Sistema atual:** Booksy (sendo substituído)
 - **Usuários finais:** Clientes via celular (mobile-first) + barbeiros no dashboard
 - **Multi-tenant:** Sim — arquitetura preparada para múltiplas barbearias desde o início
