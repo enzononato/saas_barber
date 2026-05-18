@@ -172,7 +172,7 @@ export async function getAvailableSlots(
   const professionals = await db
     .select({ userId: member.userId })
     .from(member)
-    .where(eq(member.organizationId, orgId));
+    .where(and(eq(member.organizationId, orgId), eq(member.role, "member")));
 
   const slotMap = new Map<number, Slot>();
   for (const p of professionals) {

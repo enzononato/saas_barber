@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { appointments } from "@/server/db/schema";
@@ -15,7 +15,7 @@ export async function getOrgProfessionals(orgId: string): Promise<Professional[]
     .select({ userId: member.userId, name: user.name })
     .from(member)
     .innerJoin(user, eq(member.userId, user.id))
-    .where(eq(member.organizationId, orgId));
+    .where(and(eq(member.organizationId, orgId), eq(member.role, "member")));
 }
 
 function isPgExclusionViolation(err: unknown): boolean {

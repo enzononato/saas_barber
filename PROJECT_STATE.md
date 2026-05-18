@@ -2,7 +2,7 @@
 > **Leia este arquivo antes de qualquer ação.** Ele é a fonte da verdade sobre o estado atual do projeto.
 > Para requisitos completos de produto e schema, leia `CONTEXT.md`.
 
-**Última atualização:** 2026-05-11 — FASE 2 parcialmente concluída (5 rotas públicas implementadas)
+**Última atualização:** 2026-05-16 — FASE 4 concluída
 **Atualize este arquivo ao concluir cada fase.**
 
 ---
@@ -57,7 +57,7 @@ src/
 
 > ⚠️ **Observação de schema:** `time_exceptions` usa `starts_at / ends_at` (TIMESTAMPTZ) em vez de `exception_date` (DATE). Isso é **melhor** — permite bloquear intervalos parciais do dia (ex: só de tarde). CONTEXT.md já reflete isso.
 
-### FASE 2 — API Core · `🔄 EM ANDAMENTO`
+### FASE 2 — API Core · `✅ CONCLUÍDA`
 **Responsável:** Claude Sonnet
 
 - [x] `GET  /api/[slug]/info` — dados públicos da barbearia
@@ -65,26 +65,57 @@ src/
 - [x] `GET  /api/[slug]/members` — profissionais + opção `{ id: "any", name: "Sem preferência" }`
 - [x] `GET  /api/[slug]/availability` — slots `?memberId=&serviceId=&date=` (CONTEXT.md §8 completo: working_hours × time_exceptions × appointments ativos)
 - [x] `POST /api/[slug]/appointments` — Exclusion Constraint (23P01 → 409), snapshot `price_at_booking` + `service_name_at_booking`, lógica "any" com fallback por profissional
-- [ ] `GET  /api/dashboard/appointments` — agenda do profissional autenticado
-- [ ] `GET  /api/dashboard/financial` — faturamento agregado
 
-### FASE 3 — Frontend Público (Landing + Wizard) · `⏳ AGUARDANDO FASE 2`
-**Responsável:** Gemini
+### FASE 3 — Frontend Público (Landing + Wizard) · `✅ CONCLUÍDA`
+**Responsável:** Claude Code
 
-- [ ] Landing page: identidade visual Santos Studios, fotos de cortes, CTA "Agendar"
-- [ ] Wizard 6 etapas: Serviço → Profissional → Data → Horário → Dados → Confirmação
-- [ ] Tela de sucesso pós-agendamento
-- [ ] PWA: manifest, service worker (Serwist), installability
+- [x] Landing page: identidade visual Santos Studios, fotos de cortes, CTA "Agendar"
+- [x] Wizard 6 etapas: Serviço → Profissional → Data → Horário → Dados → Confirmação
+- [x] Tela de sucesso pós-agendamento
+- [ ] PWA: manifest, service worker (Serwist), installability — **pendente (pode entrar na FASE 5)**
 
-### FASE 4 — Dashboard Administrativo · `⏳ AGUARDANDO FASE 3`
-**Responsável:** Gemini / Sonnet
+### FASE 4 — Dashboard Administrativo · `✅ CONCLUÍDA`
+**Responsável:** Claude Sonnet
 
-- [ ] Autenticação (login / registro owner)
-- [ ] Agenda do profissional (visão diária/semanal)
-- [ ] CRUD de serviços
-- [ ] CRUD de horários de trabalho e exceções
-- [ ] Painel financeiro
-- [ ] Gestão de equipe (owner: convidar/remover barbers)
+**Schema & Seed:**
+- [x] `canCreateServices: boolean` adicionado à tabela `member`
+- [x] Tabela `barber_services` (memberId → serviceId, unique constraint)
+- [x] Migration `0003_peaceful_big_bertha.sql` gerada e aplicada
+- [x] Seed reescrito: superadmin `enzononato10@gmail.com` / `Ee123456@`; rotas públicas excluem owners
+
+**Email:**
+- [x] `npm install resend`; `sendBarberWelcomeEmail` com fallback para console.log
+- [x] `RESEND_API_KEY` e `RESEND_FROM` opcionais no `.env`
+
+**Middleware:**
+- [x] `src/server/middleware/requireAuth.ts` — retorna `AuthContext | null`
+
+**API Routes (`/api/gstsantos/`):**
+- [x] `GET /api/gstsantos/me`
+- [x] `GET /api/gstsantos/barbers` + `POST` (cria usuário + membro + envia email)
+- [x] `PATCH /api/gstsantos/barbers/[memberId]` (toggle canCreateServices, owner only)
+- [x] `DELETE /api/gstsantos/barbers/[memberId]` (owner only)
+- [x] `GET /api/gstsantos/services` (inclui isAttached para membros)
+- [x] `POST /api/gstsantos/services` (canManageServices)
+- [x] `PATCH /api/gstsantos/services/[id]` (canManageServices)
+- [x] `POST /api/gstsantos/services/[id]/attach` + `DELETE` (auto-attach para barbers)
+- [x] `GET /api/gstsantos/appointments` (owner: todos; member: próprios; filtros: date, status, barberId)
+- [x] `PATCH /api/gstsantos/appointments/[id]/status`
+- [x] `GET /api/gstsantos/financial` (KPIs + daily + byService + byBarber owner-only)
+- [x] `GET/POST /api/gstsantos/working-hours`
+- [x] `GET/POST /api/gstsantos/time-exceptions` + `DELETE /[id]`
+
+**Dashboard Pages (`/gstsantos/`):**
+- [x] `login/page.tsx` — form email+senha, sem link de cadastro
+- [x] `layout.tsx` — server-side auth check + SidebarNav (desktop) + bottom nav (mobile)
+- [x] `page.tsx` — redirect → `/gstsantos/agenda?view=list`
+- [x] `agenda/page.tsx` — 4 views: Lista, Timeline, Semana, Kanban (@dnd-kit)
+- [x] `financial/page.tsx` — KPIs + LineChart + PieChart (Recharts, gold #C9A84C) + tabela por barbeiro
+- [x] `services/page.tsx` — cards com toggle ativo/inativo, attach/detach, modal create/edit
+- [x] `barbers/page.tsx` — lista com avatar iniciais, modal criar, toggle canCreateServices, remover
+- [x] `schedule/page.tsx` — grid de horários por dia + CRUD de exceções
+
+**`npx tsc --noEmit`:** ✅ zero erros
 
 ### FASE 5 — Polimento e Deploy · `⏳ AGUARDANDO FASE 4`
 - [ ] Testes de carga na rota de disponibilidade

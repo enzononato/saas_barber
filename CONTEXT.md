@@ -1,8 +1,13 @@
 # Product Requirements Document (PRD) & Architecture Context
-**Projeto:** SaaS de Agendamento Multi-Profissional para Barbearias
-**Versão:** 1.2
-**Foco da Interface:** Mobile-First (Progressive Web App - PWA)
+**Projeto:** SaaS de Agendamento — Santos Studios Barbearia (sistema privado)
+**Versão:** 1.3
+**Foco da Interface:** Mobile-First para clientes; Desktop-first para dashboard admin
 **Língua do código/schema:** Inglês (snake_case). Textos de UI e comentários: Português.
+
+> ⚠️ **DECISÃO ARQUITETURAL:** Este NÃO é um SaaS público/multi-tenant de uso geral.
+> É um sistema privado construído exclusivamente para a Santos Studios Barbearia.
+> O modelo multi-tenant foi mantido no schema para extensibilidade futura, mas
+> operacionalmente existe apenas UMA organização ativa: `slug = "santos-studios"`.
 
 ---
 
@@ -18,7 +23,8 @@ Desenvolver um sistema robusto e altamente escalável de agendamento online para
    5. **Seus dados** — Nome completo + Número de telefone (sem e-mail, sem senha — zero fricção).
    6. **Confirmação** — resumo completo antes do envio; após confirmar, exibe tela de sucesso com os detalhes.
    - **Atenção:** Não haverá gateway de pagamento/checkout neste fluxo.
-   - Acesso via slug único da barbearia (ex: `app.dominio.com/barbearia-do-ze`).
+   - Acesso em: `app.dominio.com/santos-studios`
+   - Apenas barbeiros com `working_hours` cadastrado aparecem como opção para o cliente.
 
 2. **Dashboard Administrativo (Barbeiros/Owner):** Área autenticada (SaaS) onde profissionais gerenciam sua agenda, serviços e faturamento, e o dono da barbearia gerencia a equipe e configurações gerais.
 
@@ -38,13 +44,17 @@ Cada **organização** representa uma barbearia. O isolamento de dados entre org
 
 | Papel | Quem é | O que pode fazer |
 |---|---|---|
-| `owner` | Dono da barbearia | Gerenciar equipe, serviços, configurações da org, ver financeiro global |
-| `barber` | Profissional da casa | Gerenciar sua própria agenda, ver seu próprio financeiro |
-| `public` | Cliente final | Acessar fluxo de agendamento público (sem autenticação, apenas nome + telefone) |
+| `superadmin` | Enzo (dono do sistema) | Acesso total. Adiciona/remove barbeiros. NÃO aparece como barbeiro bookável. |
+| `barber` com `can_create_services=true` | Barbeiro sênior | Cria e edita serviços, adiciona outros barbeiros, se atrela a serviços |
+| `barber` com `can_create_services=false` | Barbeiro regular | Gerencia própria agenda, se atrela a serviços existentes, vê próprio financeiro |
+| `public` | Cliente final | Acessa fluxo de agendamento público (sem autenticação, apenas nome + telefone) |
 
-- O `owner` também pode agir como `barber` (ter sua própria agenda).
-- Um usuário pode ser `barber` em múltiplas organizações.
-- Convite de novos membros é responsabilidade do `owner`.
+**Regras importantes:**
+- O superadmin (`enzononato10@gmail.com`) NUNCA aparece na lista pública de barbeiros.
+- Barbeiros podem adicionar outros barbeiros (campo `can_create_services` é definido na criação).
+- Quando um barbeiro é criado, ele recebe um e-mail automático com suas credenciais de acesso.
+- Um barbeiro só aparece como bookável para clientes se tiver `working_hours` cadastrado.
+- A rota do painel administrativo é `/gstsantos` (obscuridade intencional para o MVP).
 
 ---
 
@@ -72,8 +82,11 @@ Gerenciado pelo provedor de autenticação (Better Auth). Membros de uma ou mais
 - `id`, `email`, `name`, `phone`, `created_at`
 
 ### `members`
-Relacionamento entre `users` e `organizations` com papel.
-- `id`, `user_id`, `organization_id`, `role` (`owner` | `barber`), `created_at`
+Relacionamento entre `users` e `organizations` com papel e permissões.
+- `id`, `user_id`, `organization_id`
+- `role` (`owner` | `member`) — `owner` = superadmin
+- `can_create_services` (BOOLEAN, default `false`) — barbeiros autorizados a criar/editar serviços
+- `created_at`
 
 ### `services`
 Serviços oferecidos por uma barbearia (ex: Corte, Barba, Combo).

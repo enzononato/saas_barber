@@ -1,5 +1,6 @@
 import { boolean, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
+
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -69,6 +70,7 @@ export const member = pgTable("member", {
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
   role: text("role").notNull(),
+  canCreateServices: boolean("canCreateServices").notNull().default(false),
   createdAt: timestamp("createdAt", { withTimezone: true }).notNull(),
 });
 
