@@ -8,6 +8,7 @@ import {
   createAppointment,
   createAppointmentForAny,
 } from "@/server/services/appointments";
+import { isProfessionalAvailableAt } from "@/server/services/availability";
 import { getOrgBySlug } from "@/server/services/tenant";
 
 export async function POST(
@@ -73,6 +74,16 @@ export async function POST(
     clientPhone,
     notes,
   };
+
+  // Para barbeiro específico, validar working_hours/exceptions antes do INSERT
+  // (Exclusion Constraint só pega overlap entre appointments, não slot fora do expediente)
+  if (memberId !== "any") {
+    const endsAt = new Date(startsAt.getTime() + svc.durationMinutes * 60_000);
+    const available = await isProfessionalAvailableAt(org.id, memberId, startsAt, endsAt);
+    if (!available) {
+      return NextResponse.json({ error: "slot_unavailable" }, { status: 409 });
+    }
+  }
 
   const result =
     memberId === "any"

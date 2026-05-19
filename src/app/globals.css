@@ -488,6 +488,13 @@ section.block + section.block { border-top: 1px solid rgba(201,168,76,0.10); }
   opacity: 0.2;
 }
 .wphoto .ph-art svg { width: 60%; height: 60%; }
+.wphoto .ph-img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  display: block;
+}
 
 /* before/after slider */
 .ba {
@@ -533,6 +540,13 @@ section.block + section.block { border-top: 1px solid rgba(201,168,76,0.10); }
 }
 .ba-pane.after .ba-art { color: var(--gold); opacity: 0.42; }
 .ba-art svg { width: 100%; height: 100%; }
+.ba-photo {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
 .ba-tag {
   position: absolute;
   top: 14px;

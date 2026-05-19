@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray, lt } from "drizzle-orm";
+import { and, eq, exists, gt, inArray, lt } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { appointments } from "@/server/db/schema";
@@ -10,11 +10,21 @@ export interface Slot {
   endsAt: Date;
 }
 
+// America/Sao_Paulo offset (Brazil aboliu horário de verão em 2019, então é fixo)
+const TZ_OFFSET = "-03:00";
+
 function parseTimeOnDate(timeStr: string, dateStr: string): Date {
   const [h, m] = timeStr.split(":").map(Number);
   return new Date(
-    `${dateStr}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00.000Z`,
+    `${dateStr}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00.000${TZ_OFFSET}`,
   );
+}
+
+// Local day boundaries (Brazil) converted to UTC instants
+function dayBoundariesUtc(dateStr: string): { start: Date; end: Date } {
+  const start = new Date(`${dateStr}T00:00:00.000${TZ_OFFSET}`);
+  const end = new Date(start.getTime() + 86_400_000);
+  return { start, end };
 }
 
 function overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
@@ -27,10 +37,10 @@ export async function getSlotsForProfessional(
   durationMinutes: number,
   date: string,
 ): Promise<Slot[]> {
-  // Use T12:00Z to safely resolve weekday regardless of caller timezone
-  const dayOfWeek = new Date(`${date}T12:00:00Z`).getUTCDay();
-  const dayStart = new Date(`${date}T00:00:00.000Z`);
-  const dayEnd = new Date(dayStart.getTime() + 86_400_000);
+  if (durationMinutes <= 0) return [];
+  // Day of week in Brazil local time
+  const dayOfWeek = new Date(`${date}T12:00:00${TZ_OFFSET}`).getUTCDay();
+  const { start: dayStart, end: dayEnd } = dayBoundariesUtc(date);
 
   // 1. Horários padrão do profissional neste dia da semana
   const hours = await db
@@ -172,7 +182,23 @@ export async function getAvailableSlots(
   const professionals = await db
     .select({ userId: member.userId })
     .from(member)
-    .where(and(eq(member.organizationId, orgId), eq(member.role, "member")));
+    .where(
+      and(
+        eq(member.organizationId, orgId),
+        exists(
+          db
+            .select({ id: workingHours.id })
+            .from(workingHours)
+            .where(
+              and(
+                eq(workingHours.organizationId, orgId),
+                eq(workingHours.professionalId, member.userId),
+              ),
+            )
+            .limit(1),
+        ),
+      ),
+    );
 
   const slotMap = new Map<number, Slot>();
   for (const p of professionals) {

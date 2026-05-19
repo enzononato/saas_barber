@@ -1,8 +1,9 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, exists } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { appointments } from "@/server/db/schema";
 import { member, user } from "@/server/db/schema/auth";
+import { workingHours } from "@/server/db/schema/availability";
 import { isProfessionalAvailableAt } from "./availability";
 
 export type Professional = {
@@ -11,11 +12,28 @@ export type Professional = {
 };
 
 export async function getOrgProfessionals(orgId: string): Promise<Professional[]> {
+  // Qualquer membro com workingHours configurado é bookable (inclui owner que atende)
   return db
     .select({ userId: member.userId, name: user.name })
     .from(member)
     .innerJoin(user, eq(member.userId, user.id))
-    .where(and(eq(member.organizationId, orgId), eq(member.role, "member")));
+    .where(
+      and(
+        eq(member.organizationId, orgId),
+        exists(
+          db
+            .select({ id: workingHours.id })
+            .from(workingHours)
+            .where(
+              and(
+                eq(workingHours.organizationId, orgId),
+                eq(workingHours.professionalId, user.id),
+              ),
+            )
+            .limit(1),
+        ),
+      ),
+    );
 }
 
 function isPgExclusionViolation(err: unknown): boolean {

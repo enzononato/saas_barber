@@ -1,7 +1,8 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { db } from "@/server/db";
+import { appointments } from "@/server/db/schema";
 import { member, user } from "@/server/db/schema/auth";
 import { requireAuth } from "@/server/middleware/requireAuth";
 
@@ -50,15 +51,44 @@ export async function DELETE(
 
   const { memberId } = await params;
 
-  const [deleted] = await db
-    .delete(member)
+  // Look up the member's userId first (without deleting yet)
+  const [target] = await db
+    .select({ userId: member.userId })
+    .from(member)
     .where(and(eq(member.id, memberId), eq(member.organizationId, ctx.orgId)))
-    .returning({ id: member.id, userId: member.userId });
+    .limit(1);
 
-  if (!deleted) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  if (!target) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-  // Delete the user account entirely
-  await db.delete(user).where(eq(user.id, deleted.userId));
+  // Can't delete yourself
+  if (target.userId === ctx.userId) {
+    return NextResponse.json({ error: "cannot_delete_self" }, { status: 409 });
+  }
+
+  // Block deletion if barber has any appointments (history must be preserved)
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.organizationId, ctx.orgId),
+        eq(appointments.professionalId, target.userId),
+      ),
+    );
+
+  if (count > 0) {
+    return NextResponse.json(
+      { error: "has_appointments", count },
+      { status: 409 },
+    );
+  }
+
+  await db
+    .delete(member)
+    .where(and(eq(member.id, memberId), eq(member.organizationId, ctx.orgId)));
+
+  // user delete cascades to member, session, account
+  await db.delete(user).where(eq(user.id, target.userId));
 
   return NextResponse.json({ ok: true });
 }

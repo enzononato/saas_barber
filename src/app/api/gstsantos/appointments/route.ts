@@ -25,8 +25,9 @@ export async function GET(req: Request) {
   }
 
   if (date) {
-    const start = new Date(date + "T00:00:00Z");
-    const end = new Date(date + "T23:59:59.999Z");
+    // Brazil local day → UTC (no DST since 2019)
+    const start = new Date(date + "T00:00:00-03:00");
+    const end = new Date(start.getTime() + 86_400_000 - 1);
     conditions.push(gte(appointments.startsAt, start));
     conditions.push(lte(appointments.startsAt, end));
   }

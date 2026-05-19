@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
-import { sendBarberWelcomeEmail } from "@/lib/email";
+import { sendBarberInviteEmail } from "@/lib/email";
 import { env } from "@/lib/env";
 import { db } from "@/server/db";
 import { member, user } from "@/server/db/schema/auth";
@@ -43,11 +43,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "name and email are required" }, { status: 400 });
   }
 
-  const password = "Santos@" + Math.floor(1000 + Math.random() * 9000);
-
-  // Create user via Better Auth
+  // Create user with a random password — the barber will set their own via the invite link
+  const tempPassword = crypto.randomUUID();
   const signUpRes = await auth.api.signUpEmail({
-    body: { name, email, password },
+    body: { name, email, password: tempPassword },
   });
 
   if (!signUpRes?.user) {
@@ -68,8 +67,17 @@ export async function POST(req: Request) {
     createdAt: new Date(),
   });
 
-  const loginUrl = env.BETTER_AUTH_URL + "/gstsantos";
-  await sendBarberWelcomeEmail({ name, email, password, loginUrl });
+  // Trigger the "set your password" email via Better Auth's reset flow
+  const setupPage = `${env.BETTER_AUTH_URL}/gstsantos/reset-password`;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (auth.api as any).requestPasswordReset({
+      body: { email, redirectTo: setupPage },
+    });
+  } catch (err) {
+    // Log but don't fail — admin can resend later
+    console.error("[INVITE] requestPasswordReset failed:", err);
+  }
 
   return NextResponse.json({ memberId, userId: newUserId, name, email }, { status: 201 });
 }

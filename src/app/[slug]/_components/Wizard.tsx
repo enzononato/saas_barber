@@ -45,13 +45,12 @@ const fmtDuration = (min: number) => {
 const STEP_TITLES = [
   "Escolha o serviço",
   "Quem corta hoje?",
-  "Em qual dia?",
-  "A que horas?",
+  "Data e horário",
   "Seus dados",
   "Confirme tudo",
 ];
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 5;
 
 const DOW_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const MON_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -194,26 +193,32 @@ function StepMember({
   );
 }
 
-function StepDate({
+function StepDateAndTime({
   slug,
   memberId,
   serviceId,
   selectedDate,
-  onSelect,
+  selectedSlot,
+  onSelectDate,
+  onSelectSlot,
 }: {
   slug: string;
   memberId: string;
   serviceId: string;
   selectedDate: Date | null;
-  onSelect: (d: Date) => void;
+  selectedSlot: Slot | null;
+  onSelectDate: (d: Date) => void;
+  onSelectSlot: (s: Slot | null) => void;
 }) {
   const dates = useMemo(() => next14Days(), []);
   const [availMap, setAvailMap] = useState<Record<string, boolean>>({});
-  const [loading, setLoading] = useState(true);
+  const [loadingDates, setLoadingDates] = useState(true);
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    setLoadingDates(true);
     (async () => {
       const entries = await Promise.all(
         dates.map(async (d) => {
@@ -231,91 +236,31 @@ function StepDate({
       );
       if (!cancelled) {
         setAvailMap(Object.fromEntries(entries));
-        setLoading(false);
+        setLoadingDates(false);
       }
     })();
     return () => { cancelled = true; };
   }, [slug, memberId, serviceId]);
 
-  return (
-    <div className="wz-step">
-      <p style={{ color: "var(--paper-mute)", fontSize: 14, marginBottom: 18 }}>
-        Próximos 14 dias. Dias sem espaço aparecem desabilitados.
-      </p>
-      {loading ? (
-        <div className="loading-row">
-          <div className="spin spin-gold" />
-          <span className="lbl">verificando disponibilidade</span>
-        </div>
-      ) : (
-        <div className="date-rail">
-          {dates.map((d) => {
-            const k = fmtDateKey(d);
-            const has = availMap[k];
-            const isSel = selectedDate && fmtDateKey(selectedDate) === k;
-            return (
-              <button
-                key={k}
-                type="button"
-                className={`date-chip ${isSel ? "sel" : ""}`}
-                disabled={!has}
-                onClick={() => onSelect(d)}
-              >
-                <div className="dow">{DOW_PT[d.getDay()]}</div>
-                <div className="d">{d.getDate()}</div>
-                <div className="mon">{MON_PT[d.getMonth()]}</div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-      {!loading && Object.values(availMap).every((v) => !v) && (
-        <div className="empty" style={{ marginTop: 20 }}>
-          <Icons.Calendar className="ic" />
-          <div>Sem disponibilidade nos próximos 14 dias.</div>
-          <div style={{ fontSize: 12, marginTop: 6 }}>Tente outro profissional.</div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function StepTime({
-  slug,
-  memberId,
-  serviceId,
-  date,
-  selectedSlot,
-  onSelect,
-}: {
-  slug: string;
-  memberId: string;
-  serviceId: string;
-  date: Date;
-  selectedSlot: Slot | null;
-  onSelect: (s: Slot) => void;
-}) {
-  const [slots, setSlots] = useState<Slot[]>([]);
-  const [loading, setLoading] = useState(true);
-
   useEffect(() => {
+    if (!selectedDate) { setSlots([]); return; }
     let cancelled = false;
-    setLoading(true);
+    setLoadingSlots(true);
     (async () => {
       try {
         const r = await fetch(
-          `/api/${slug}/availability?memberId=${memberId}&serviceId=${serviceId}&date=${fmtDateKey(date)}`,
+          `/api/${slug}/availability?memberId=${memberId}&serviceId=${serviceId}&date=${fmtDateKey(selectedDate)}`,
         );
         const json = await r.json();
         if (!cancelled) setSlots(json.slots ?? []);
       } catch {
         if (!cancelled) setSlots([]);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setLoadingSlots(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [slug, memberId, serviceId, date]);
+  }, [slug, memberId, serviceId, selectedDate]);
 
   const groups = useMemo(() => {
     const m: Slot[] = [], t: Slot[] = [], n: Slot[] = [];
@@ -333,32 +278,12 @@ function StepTime({
     return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   };
 
-  if (loading) {
-    return (
-      <div className="wz-step">
-        <div className="loading-row">
-          <div className="spin spin-gold" />
-          <span className="lbl">buscando horários</span>
-        </div>
-      </div>
-    );
-  }
+  const handleDateSelect = (d: Date) => {
+    onSelectDate(d);
+    onSelectSlot(null);
+  };
 
-  if (slots.length === 0) {
-    return (
-      <div className="wz-step">
-        <div className="empty">
-          <Icons.Clock className="ic" />
-          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, color: "var(--paper)" }}>
-            Nenhum horário disponível nesta data
-          </div>
-          <div style={{ marginTop: 8 }}>Volte e escolha outra data ou outro profissional.</div>
-        </div>
-      </div>
-    );
-  }
-
-  const renderGroup = (label: string, arr: Slot[]) =>
+  const renderSlotGroup = (label: string, arr: Slot[]) =>
     arr.length > 0 && (
       <div className="slot-group">
         <h5>
@@ -370,7 +295,7 @@ function StepTime({
               key={s.startsAt}
               type="button"
               className={`slot ${selectedSlot?.startsAt === s.startsAt ? "sel" : ""}`}
-              onClick={() => onSelect(s)}
+              onClick={() => onSelectSlot(s)}
             >
               {fmtHM(s.startsAt)}
             </button>
@@ -382,19 +307,81 @@ function StepTime({
   return (
     <div className="wz-step">
       <p style={{ color: "var(--paper-mute)", fontSize: 14, marginBottom: 18 }}>
-        {DOW_PT[date.getDay()]}, {date.getDate()} de {MON_FULL[date.getMonth()]}
-        {" · "}
-        <span style={{ color: "var(--gold)" }}>{slots.length} horários</span>
+        Próximos 14 dias. Dias sem espaço aparecem desabilitados.
       </p>
-      {renderGroup("Manhã", groups.m)}
-      {renderGroup("Tarde", groups.t)}
-      {renderGroup("Noite", groups.n)}
+
+      {loadingDates ? (
+        <div className="loading-row">
+          <div className="spin spin-gold" />
+          <span className="lbl">verificando disponibilidade</span>
+        </div>
+      ) : (
+        <div className="date-rail">
+          {dates.map((d) => {
+            const k = fmtDateKey(d);
+            const has = availMap[k];
+            const isSel = selectedDate && fmtDateKey(selectedDate) === k;
+            return (
+              <button
+                key={k}
+                type="button"
+                className={`date-chip ${isSel ? "sel" : ""}`}
+                disabled={!has}
+                onClick={() => handleDateSelect(d)}
+              >
+                <div className="dow">{DOW_PT[d.getDay()]}</div>
+                <div className="d">{d.getDate()}</div>
+                <div className="mon">{MON_PT[d.getMonth()]}</div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {!loadingDates && Object.values(availMap).every((v) => !v) && (
+        <div className="empty" style={{ marginTop: 20 }}>
+          <Icons.Calendar className="ic" />
+          <div>Sem disponibilidade nos próximos 14 dias.</div>
+          <div style={{ fontSize: 12, marginTop: 6 }}>Tente outro profissional.</div>
+        </div>
+      )}
+
+      {selectedDate && (
+        <div style={{ marginTop: 28, borderTop: "1px solid var(--ink-line)", paddingTop: 24 }}>
+          {loadingSlots ? (
+            <div className="loading-row">
+              <div className="spin spin-gold" />
+              <span className="lbl">buscando horários</span>
+            </div>
+          ) : slots.length === 0 ? (
+            <div className="empty">
+              <Icons.Clock className="ic" />
+              <div>Nenhum horário disponível nesta data.</div>
+              <div style={{ fontSize: 12, marginTop: 6 }}>Tente outro dia.</div>
+            </div>
+          ) : (
+            <>
+              <p style={{ color: "var(--paper-mute)", fontSize: 14, marginBottom: 18 }}>
+                {DOW_PT[selectedDate.getDay()]}, {selectedDate.getDate()} de {MON_FULL[selectedDate.getMonth()]}
+                {" · "}
+                <span style={{ color: "var(--gold)" }}>{slots.length} horários</span>
+              </p>
+              {renderSlotGroup("Manhã", groups.m)}
+              {renderSlotGroup("Tarde", groups.t)}
+              {renderSlotGroup("Noite", groups.n)}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
 function formatPhoneBR(raw: string): string {
-  const digits = raw.replace(/\D/g, "").slice(0, 11);
+  let digits = raw.replace(/\D/g, "");
+  // Remove "55" country code prefix if present (collado from formats like +55 ou 0055)
+  if (digits.length > 11 && digits.startsWith("55")) digits = digits.slice(2);
+  digits = digits.slice(0, 11);
   if (digits.length === 0) return "";
   if (digits.length <= 2) return `(${digits}`;
   if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
@@ -610,10 +597,13 @@ export function Wizard({
   const setForm = (patch: Partial<FormState>) => setFormState((f) => ({ ...f, ...patch }));
 
   useEffect(() => {
-    if (open && presetService) {
+    // Só aplica o preset quando o wizard ABRE com um preset definido
+    // (evita pular pra step 2 se user voltar pra step 1 e mudar o serviço)
+    if (open && presetService && !service) {
       setService(presetService);
       setStep(2);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, presetService]);
 
   useEffect(() => {
@@ -639,9 +629,8 @@ export function Wizard({
   const validate = () => {
     if (step === 1) return !!service;
     if (step === 2) return !!member;
-    if (step === 3) return !!date;
-    if (step === 4) return !!slot;
-    if (step === 5) {
+    if (step === 3) return !!date && !!slot;
+    if (step === 4) {
       const errs: Partial<Record<keyof FormState, string>> = {};
       if (!form.clientName.trim() || form.clientName.trim().length < 2)
         errs.clientName = "Informe seu nome completo.";
@@ -656,7 +645,7 @@ export function Wizard({
 
   const handleNext = async () => {
     if (!validate()) return;
-    if (step < 6) {
+    if (step < 5) {
       setStep((s) => s + 1);
       return;
     }
@@ -702,7 +691,7 @@ export function Wizard({
   const handleErrorBackToTime = () => {
     setErrorMsg(null);
     setSlot(null);
-    setStep(4);
+    setStep(3);
   };
 
   const handleAgain = () => {
@@ -720,9 +709,8 @@ export function Wizard({
   const canNext = useMemo(() => {
     if (step === 1) return !!service;
     if (step === 2) return !!member;
-    if (step === 3) return !!date;
-    if (step === 4) return !!slot;
-    if (step === 5) {
+    if (step === 3) return !!date && !!slot;
+    if (step === 4) {
       const digits = form.clientPhone.replace(/\D/g, "");
       return form.clientName.trim().length >= 2 && digits.length >= 10;
     }
@@ -781,28 +769,20 @@ export function Wizard({
                 />
               )}
               {step === 3 && member && service && (
-                <StepDate
+                <StepDateAndTime
                   slug={slug}
                   memberId={member.id}
                   serviceId={service.id}
                   selectedDate={date}
-                  onSelect={setDate}
-                />
-              )}
-              {step === 4 && member && service && date && (
-                <StepTime
-                  slug={slug}
-                  memberId={member.id}
-                  serviceId={service.id}
-                  date={date}
                   selectedSlot={slot}
-                  onSelect={setSlot}
+                  onSelectDate={(d) => { setDate(d); setSlot(null); }}
+                  onSelectSlot={(s) => setSlot(s)}
                 />
               )}
-              {step === 5 && (
+              {step === 4 && (
                 <StepDetails form={form} setForm={setForm} errors={errors} />
               )}
-              {step === 6 && service && member && slot && (
+              {step === 5 && service && member && slot && (
                 <StepConfirm
                   payload={{ service, member, slot, ...form }}
                   errorMsg={errorMsg}
@@ -825,7 +805,7 @@ export function Wizard({
                 Voltar
               </button>
             )}
-            {step === 6 && errorMsg ? (
+            {step === 5 && errorMsg ? (
               <button type="button" className="btn btn-primary" onClick={handleErrorBackToTime}>
                 Escolher outro horário
                 <Icons.ArrowRight style={{ width: 14, height: 14 }} />
@@ -842,7 +822,7 @@ export function Wizard({
                     <span className="spin" />
                     Confirmando...
                   </>
-                ) : step === 6 ? (
+                ) : step === 5 ? (
                   <>
                     Confirmar agendamento
                     <Icons.Check style={{ width: 14, height: 14 }} />

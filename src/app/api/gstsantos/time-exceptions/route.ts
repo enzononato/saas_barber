@@ -1,7 +1,8 @@
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, inArray, lt } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { db } from "@/server/db";
+import { appointments } from "@/server/db/schema";
 import { timeExceptions } from "@/server/db/schema/availability";
 import { requireAuth } from "@/server/middleware/requireAuth";
 
@@ -62,6 +63,27 @@ export async function POST(req: Request) {
   const targetUserId = ctx.role === "owner" && body.professionalId
     ? (body.professionalId as string)
     : ctx.userId;
+
+  // Bloquear se existe appointment SCHEDULED no intervalo da exceção
+  const conflicts = await db
+    .select({ id: appointments.id, startsAt: appointments.startsAt })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.organizationId, ctx.orgId),
+        eq(appointments.professionalId, targetUserId),
+        inArray(appointments.status, ["SCHEDULED"]),
+        lt(appointments.startsAt, end),
+        gt(appointments.endsAt, start),
+      ),
+    );
+
+  if (conflicts.length > 0) {
+    return NextResponse.json(
+      { error: "has_conflicting_appointments", count: conflicts.length },
+      { status: 409 },
+    );
+  }
 
   const [created] = await db
     .insert(timeExceptions)

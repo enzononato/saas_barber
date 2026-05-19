@@ -2,7 +2,7 @@
 > **Leia este arquivo antes de qualquer ação.** Ele é a fonte da verdade sobre o estado atual do projeto.
 > Para requisitos completos de produto e schema, leia `CONTEXT.md`.
 
-**Última atualização:** 2026-05-16 — FASE 4 concluída
+**Última atualização:** 2026-05-18 — FASE 4 concluída + correções de bugs críticos
 **Atualize este arquivo ao concluir cada fase.**
 
 ---
@@ -17,7 +17,7 @@
 | Banco | PostgreSQL + extensão `btree_gist` |
 | Auth | Better Auth + plugin `organizations` + adapter Drizzle |
 | Validação | Zod (compartilhada client/server) |
-| Deploy | A definir (Fly.io / Railway + Neon Postgres) |
+| Deploy | VPS Própria (Easypanel) — Banco e App na mesma infraestrutura |
 
 ---
 
@@ -70,9 +70,13 @@ src/
 **Responsável:** Claude Code
 
 - [x] Landing page: identidade visual Santos Studios, fotos de cortes, CTA "Agendar"
-- [x] Wizard 6 etapas: Serviço → Profissional → Data → Horário → Dados → Confirmação
+- [x] Wizard 5 etapas: Serviço → Profissional → Data+Horário (unificados) → Dados → Confirmação
 - [x] Tela de sucesso pós-agendamento
-- [ ] PWA: manifest, service worker (Serwist), installability — **pendente (pode entrar na FASE 5)**
+- [x] PWA: manifest (`src/app/manifest.ts`), service worker Serwist (`src/app/sw.ts`), ícones via `ImageResponse` (32px favicon, 180px apple-icon, 192/512px manifest) — SW desabilitado em dev
+- [x] Galeria com fotos reais (`public/imgs/`) no lugar dos SVGs placeholder
+- [x] Before/After com `antes.jpg` / `depois.jpg` reais
+- [x] Hero-meta: contagem de serviços e barbeiros dinâmica (vinda do banco)
+- [x] Bug fix: "Sem preferência" não mostrava horários — query de `getAvailableSlots` agora filtra apenas profissionais com `workingHours` cadastrados (mesmo critério do endpoint `/members`)
 
 ### FASE 4 — Dashboard Administrativo · `✅ CONCLUÍDA`
 **Responsável:** Claude Sonnet
@@ -117,11 +121,43 @@ src/
 
 **`npx tsc --noEmit`:** ✅ zero erros
 
-### FASE 5 — Polimento e Deploy · `⏳ AGUARDANDO FASE 4`
+**Fluxo de convite de barbeiro (implementado nesta sessão):**
+- Admin cria barbeiro → usuário criado com senha aleatória → membro inserido → Better Auth dispara email com link `reset-password`
+- Endpoint correto: `POST /api/auth/request-password-reset` (não `/forget-password`)
+- Página `/gstsantos/reset-password?token=` lê token da query string via `authClient.resetPassword()`
+- `sendResetPassword` callback em `src/lib/auth.ts` chama `sendPasswordResetEmail` (mesmo email para convite e esqueci-senha)
+- Testado end-to-end: 302 redirect do Better Auth → página reset → login → agenda ✅
+
+**Rotas `(protected)/` (implementado nesta sessão):**
+- Route group `(protected)/` isola páginas autenticadas do login — resolve redirect loop anterior
+- `layout.tsx` só existe dentro de `(protected)/`, cobre todas as páginas do dashboard exceto login/forgot-password/reset-password
+- Link hrefs para rotas do dashboard precisam de cast `as any` (typedRoutes rejeita rotas não-literais)
+
+### FASE 5 — Polimento e Deploy · `🔄 EM ANDAMENTO`
+- [x] PWA (Serwist) — concluído
+- [x] Fotos reais na landing page
+- [x] Melhorias UX no wizard (data+horário unificados, 5 passos)
+- [x] Bug fix disponibilidade "Sem preferência"
+- [x] **Auditoria + correções de bugs:**
+  - Timezone: `parseTimeOnDate` agora usa offset Brasil (-03:00); filtro de data da agenda também
+  - "Qualquer membro com `workingHours` é barbeiro" (não só `role="member"`) — alinhado em 4 lugares: `[slug]/page.tsx`, `/api/[slug]/members`, `getAvailableSlots`, `getOrgProfessionals`
+  - `durationMinutes <= 0` → retorna [] (defesa contra loop infinito)
+  - Kanban: rollback de status + sync com prop após refetch
+  - DELETE barbeiro: bloqueia se tem appointments; bloqueia auto-delete (`cannot_delete_self`)
+  - time-exceptions POST: bloqueia se há appointment SCHEDULED sobreposto (409 `has_conflicting_appointments`)
+  - POST appointments para barbeiro específico: valida `isProfessionalAvailableAt` antes do INSERT
+  - `formatPhoneBR`: aceita +55 prefix
+  - Wizard `presetService`: só aplica preset se ainda não há serviço escolhido
+  - Wizard `handleNext`: `step < 6` → `step < 5` (corrige "etapa 6 de 5")
 - [ ] Testes de carga na rota de disponibilidade
-- [ ] Configurar Neon Postgres (produção)
-- [ ] Deploy Next.js (Fly.io ou Railway)
-- [ ] Domínio customizado
+- [ ] Configuração do projeto no Easypanel (App Next.js)
+- [ ] Conexão com o banco Postgres interno do Easypanel
+- [ ] Configuração de domínio e SSL (via Easypanel)
+
+### Bugs conhecidos não resolvidos
+- **Timezone hardcoded**: usado offset `-03:00` em vários lugares; OK pra Santos Studios mas não escala para multi-tenant em outros fusos. Refatorar para `org.timezone` quando expandir.
+- **Schedule page do owner**: owner consegue editar próprios horários via `/api/gstsantos/working-hours` (sem `professionalId` no body usa `ctx.userId`). Mas a UI atual não tem seletor de barbeiro pro owner editar OUTROS barbeiros — funcionalidade limitada.
+- **`canCreateServices` permite gerenciar barbers**: lógica em `/api/gstsantos/barbers/route.ts:36` (`ctx.role === "owner" || ctx.canCreateServices`) — semântica confusa, deveria ser flag separada.
 
 ---
 

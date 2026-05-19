@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -203,6 +204,16 @@ export default function LoginPage() {
           >
             {loading ? "Entrando..." : "Entrar"}
           </button>
+
+          <p style={{ textAlign: "center", margin: "20px 0 0" }}>
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            <Link
+              href={"/gstsantos/forgot-password" as any}
+              style={{ color: "#8A847A", fontSize: 13, textDecoration: "none" }}
+            >
+              Esqueci minha senha
+            </Link>
+          </p>
         </form>
       </div>
     </div>

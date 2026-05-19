@@ -5,6 +5,7 @@ import { organization } from "better-auth/plugins";
 import { db } from "@/server/db";
 import * as authSchema from "@/server/db/schema/auth";
 import { env } from "@/lib/env";
+import { sendPasswordResetEmail } from "@/lib/email";
 
 export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
@@ -23,6 +24,13 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
+    sendResetPassword: async ({ user, url }) => {
+      await sendPasswordResetEmail({
+        name: user.name,
+        email: user.email,
+        resetUrl: url,
+      });
+    },
   },
   plugins: [
     organization({

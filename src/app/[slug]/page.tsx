@@ -1,8 +1,9 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, exists } from "drizzle-orm";
 import { notFound } from "next/navigation";
 
 import { db } from "@/server/db";
 import { member, user } from "@/server/db/schema/auth";
+import { workingHours } from "@/server/db/schema/availability";
 import { services } from "@/server/db/schema/services";
 import { getOrgBySlug } from "@/server/services/tenant";
 import { BookingPage } from "./_components/BookingPage";
@@ -46,7 +47,23 @@ export default async function Page({
       .select({ id: user.id, name: user.name })
       .from(member)
       .innerJoin(user, eq(member.userId, user.id))
-      .where(eq(member.organizationId, org.id))
+      .where(
+        and(
+          eq(member.organizationId, org.id),
+          exists(
+            db
+              .select({ id: workingHours.id })
+              .from(workingHours)
+              .where(
+                and(
+                  eq(workingHours.organizationId, org.id),
+                  eq(workingHours.professionalId, user.id),
+                ),
+              )
+              .limit(1),
+          ),
+        ),
+      )
       .orderBy(user.name),
   ]);
 

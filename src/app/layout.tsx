@@ -3,14 +3,31 @@ import "./globals.css";
 import type { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {
-  title: "SaaS Barber",
-  description: "Agendamento online para barbearias",
+  applicationName: "Santos Studios",
+  title: {
+    default: "Santos Studios",
+    template: "%s | Santos Studios",
+  },
+  description: "Painel administrativo da Barbearia Santos Studios",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Santos Studios",
+  },
+  formatDetection: {
+    telephone: false,
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0B0B0B",
+  minimumScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0B0B0B" },
+    { media: "(prefers-color-scheme: light)", color: "#0B0B0B" },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
