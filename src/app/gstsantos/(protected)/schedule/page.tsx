@@ -20,8 +20,18 @@ interface TimeException {
   reason: string | null;
 }
 
-// Working hours are stored per day: 0=Sun...6=Sat
-// We edit Mon-Sun (1-0) for better UX
+interface Barber {
+  memberId: string;
+  userId: string;
+  name: string;
+}
+
+interface Me {
+  id: string;
+  name: string;
+  role: string;
+}
+
 const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0]; // Mon first
 
 type DayState = { enabled: boolean; startTime: string; endTime: string };
@@ -46,32 +56,53 @@ function fmtDatetime(iso: string) {
 }
 
 export default function SchedulePage() {
+  const [me, setMe] = useState<Me | null>(null);
+  const [barbers, setBarbers] = useState<Barber[]>([]);
+  const [selectedProfId, setSelectedProfId] = useState<string | null>(null);
+
   const [hours, setHours] = useState<Record<number, DayState>>({});
   const [exceptions, setExceptions] = useState<TimeException[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [exForm, setExForm] = useState({
-    startsAt: "",
-    endsAt: "",
-    reason: "",
-  });
+  const [exForm, setExForm] = useState({ startsAt: "", endsAt: "", reason: "" });
   const [addingEx, setAddingEx] = useState(false);
 
+  // Phase 1: fetch identity + barbers list (owner only)
+  useEffect(() => {
+    async function init() {
+      const meRes = await fetch("/api/gstsantos/me");
+      if (!meRes.ok) return;
+      const meData = (await meRes.json()) as Me;
+      setMe(meData);
+      setSelectedProfId(meData.id);
+
+      if (meData.role === "owner") {
+        const barbRes = await fetch("/api/gstsantos/barbers");
+        if (barbRes.ok) setBarbers(await barbRes.json());
+      }
+    }
+    void init();
+  }, []);
+
+  // Phase 2: fetch schedule data whenever selected professional changes
   const fetchAll = useCallback(async () => {
+    if (!selectedProfId || !me) return;
     setLoading(true);
+    const qs = me.role === "owner" ? `?professionalId=${selectedProfId}` : "";
     const [whRes, exRes] = await Promise.all([
-      fetch("/api/gstsantos/working-hours"),
-      fetch("/api/gstsantos/time-exceptions"),
+      fetch(`/api/gstsantos/working-hours${qs}`),
+      fetch(`/api/gstsantos/time-exceptions${qs}`),
     ]);
     if (whRes.ok) setHours(buildDayMap(await whRes.json()));
     if (exRes.ok) setExceptions(await exRes.json());
     setLoading(false);
-  }, []);
+  }, [selectedProfId, me]);
 
   useEffect(() => { void fetchAll(); }, [fetchAll]);
 
   async function saveHours() {
+    if (!selectedProfId || !me) return;
     setSaving(true);
     const hoursArr = WEEK_DAYS.filter((d) => hours[d]?.enabled).map((d) => ({
       dayOfWeek: d,
@@ -82,26 +113,38 @@ export default function SchedulePage() {
     await fetch("/api/gstsantos/working-hours", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hours: hoursArr }),
+      body: JSON.stringify({
+        hours: hoursArr,
+        ...(me.role === "owner" ? { professionalId: selectedProfId } : {}),
+      }),
     });
     setSaving(false);
     await fetchAll();
   }
 
   async function addException() {
+    if (!selectedProfId || !me) return;
     setAddingEx(true);
-    await fetch("/api/gstsantos/time-exceptions", {
+    const res = await fetch("/api/gstsantos/time-exceptions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         startsAt: exForm.startsAt,
         endsAt: exForm.endsAt,
         reason: exForm.reason || null,
+        ...(me.role === "owner" ? { professionalId: selectedProfId } : {}),
       }),
     });
     setAddingEx(false);
-    setExForm({ startsAt: "", endsAt: "", reason: "" });
-    await fetchAll();
+    if (res.ok) {
+      setExForm({ startsAt: "", endsAt: "", reason: "" });
+      await fetchAll();
+    } else {
+      const data = await res.json() as { error: string; count?: number };
+      if (data.error === "has_conflicting_appointments") {
+        alert(`Há ${data.count ?? ""} agendamento(s) nesse período. Cancele-os antes de bloquear.`);
+      }
+    }
   }
 
   async function deleteException(id: string) {
@@ -113,13 +156,47 @@ export default function SchedulePage() {
     setHours((prev) => ({ ...prev, [day]: { ...prev[day], ...patch } }));
   }
 
+  const isOwner = me?.role === "owner";
+  const selectedName =
+    selectedProfId === me?.id
+      ? "Minha agenda"
+      : barbers.find((b) => b.userId === selectedProfId)?.name ?? "Agenda";
+
+  const pageTitle = isOwner && selectedProfId !== me?.id
+    ? `Agenda de ${selectedName}`
+    : "Minha Agenda";
+
   return (
     <div style={{ padding: "24px 20px", maxWidth: 700, margin: "0 auto" }}>
-      <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F4EEDF", margin: "0 0 24px" }}>
-        Minha Agenda
+      <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F4EEDF", margin: "0 0 20px" }}>
+        {pageTitle}
       </h1>
 
-      {loading ? (
+      {/* Barber selector — owner only */}
+      {isOwner && barbers.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <label style={{ ...labelStyle, marginBottom: 6, display: "block" }}>
+            Editando agenda de
+          </label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <ProfButton
+              active={selectedProfId === me?.id}
+              onClick={() => setSelectedProfId(me!.id)}
+              label="Eu mesmo"
+            />
+            {barbers.map((b) => (
+              <ProfButton
+                key={b.userId}
+                active={selectedProfId === b.userId}
+                onClick={() => setSelectedProfId(b.userId)}
+                label={b.name}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!me || (loading && Object.keys(hours).length === 0) ? (
         <p style={{ color: "#8A847A" }}>Carregando...</p>
       ) : (
         <>
@@ -143,20 +220,12 @@ export default function SchedulePage() {
                 return (
                   <div
                     key={day}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                      flexWrap: "wrap",
-                    }}
+                    style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}
                   >
-                    {/* Toggle */}
                     <ToggleSwitch
                       checked={ds.enabled}
                       onChange={() => updateDay(day, { enabled: !ds.enabled })}
                     />
-
-                    {/* Day name */}
                     <span
                       style={{
                         width: 32,
@@ -194,7 +263,7 @@ export default function SchedulePage() {
 
             <button
               onClick={() => void saveHours()}
-              disabled={saving}
+              disabled={saving || loading}
               style={{ ...primaryBtn, marginTop: 20, marginLeft: 0 }}
             >
               {saving ? "Salvando..." : "Salvar horários"}
@@ -229,7 +298,7 @@ export default function SchedulePage() {
               </p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end" }}>
                 <div>
-                  <label style={label}>De</label>
+                  <label style={labelStyle}>De</label>
                   <input
                     type="datetime-local"
                     value={exForm.startsAt}
@@ -238,7 +307,7 @@ export default function SchedulePage() {
                   />
                 </div>
                 <div>
-                  <label style={label}>Até</label>
+                  <label style={labelStyle}>Até</label>
                   <input
                     type="datetime-local"
                     value={exForm.endsAt}
@@ -247,7 +316,7 @@ export default function SchedulePage() {
                   />
                 </div>
                 <div style={{ flex: 1, minWidth: 120 }}>
-                  <label style={label}>Motivo (opcional)</label>
+                  <label style={labelStyle}>Motivo (opcional)</label>
                   <input
                     type="text"
                     value={exForm.reason}
@@ -320,6 +389,35 @@ export default function SchedulePage() {
   );
 }
 
+function ProfButton({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: "6px 14px",
+        borderRadius: 999,
+        border: active ? "1.5px solid #C9A84C" : "1.5px solid #2A2620",
+        background: active ? "rgba(201,168,76,0.12)" : "transparent",
+        color: active ? "#C9A84C" : "#8A847A",
+        fontSize: 13,
+        fontWeight: active ? 600 : 400,
+        cursor: "pointer",
+        transition: "all 0.15s",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
 function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () => void }) {
   return (
     <div
@@ -374,7 +472,7 @@ const primaryBtn: React.CSSProperties = {
   flexShrink: 0,
 };
 
-const label: React.CSSProperties = {
+const labelStyle: React.CSSProperties = {
   display: "block",
   fontSize: 10,
   color: "#8A847A",

@@ -101,6 +101,7 @@ export async function createAppointment(
 export async function createAppointmentForAny(
   orgId: string,
   params: Omit<CreateAppointmentParams, "orgId" | "professionalId">,
+  timezone = "America/Sao_Paulo",
 ): Promise<CreateAppointmentResult> {
   const endsAt = new Date(params.startsAt.getTime() + params.durationMinutes * 60_000);
   const professionals = await getOrgProfessionals(orgId);
@@ -111,6 +112,7 @@ export async function createAppointmentForAny(
       p.userId,
       params.startsAt,
       endsAt,
+      timezone,
     );
     if (!available) continue;
 

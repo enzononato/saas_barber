@@ -79,7 +79,7 @@ export async function POST(
   // (Exclusion Constraint só pega overlap entre appointments, não slot fora do expediente)
   if (memberId !== "any") {
     const endsAt = new Date(startsAt.getTime() + svc.durationMinutes * 60_000);
-    const available = await isProfessionalAvailableAt(org.id, memberId, startsAt, endsAt);
+    const available = await isProfessionalAvailableAt(org.id, memberId, startsAt, endsAt, org.timezone);
     if (!available) {
       return NextResponse.json({ error: "slot_unavailable" }, { status: 409 });
     }
@@ -87,7 +87,7 @@ export async function POST(
 
   const result =
     memberId === "any"
-      ? await createAppointmentForAny(org.id, appointmentParams)
+      ? await createAppointmentForAny(org.id, appointmentParams, org.timezone)
       : await createAppointment({ ...appointmentParams, orgId: org.id, professionalId: memberId });
 
   if (!result.ok) {

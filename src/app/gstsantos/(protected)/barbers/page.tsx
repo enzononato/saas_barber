@@ -7,11 +7,13 @@ interface Barber {
   userId: string;
   name: string;
   email: string;
+  role: string;
   canCreateServices: boolean;
   createdAt: string;
 }
 
 interface Me {
+  id: string;
   role: "owner" | "member";
   canCreateServices: boolean;
 }
@@ -29,9 +31,8 @@ export default function BarbersPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "" });
+  const [form, setForm] = useState({ name: "", email: "", isAdmin: false });
   const [saving, setSaving] = useState(false);
-  const [lastCreated, setLastCreated] = useState<{ password: string; name: string } | null>(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -51,34 +52,40 @@ export default function BarbersPage() {
     const res = await fetch("/api/gstsantos/barbers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ name: form.name, email: form.email, isAdmin: form.isAdmin }),
     });
     setSaving(false);
 
     if (res.ok) {
-      // Password was generated server-side; show from server response
-      // But server doesn't return password — the email was sent.
-      // We close the modal and show a success note.
       setShowModal(false);
-      setForm({ name: "", email: "" });
+      setForm({ name: "", email: "", isAdmin: false });
       await fetchAll();
     } else {
-      const err = await res.json();
+      const err = await res.json() as { error: string };
       alert(err.error ?? "Erro ao criar barbeiro.");
     }
   }
 
   async function handleDelete(memberId: string) {
     if (!confirm("Remover este barbeiro? Esta ação é irreversível.")) return;
-    await fetch(`/api/gstsantos/barbers/${memberId}`, { method: "DELETE" });
+    const res = await fetch(`/api/gstsantos/barbers/${memberId}`, { method: "DELETE" });
+    if (!res.ok) {
+      const err = await res.json() as { error: string; count?: number };
+      if (err.error === "has_appointments") {
+        alert(`Este barbeiro tem ${err.count ?? ""} agendamento(s) no histórico e não pode ser removido.`);
+      } else {
+        alert(err.error ?? "Erro ao remover.");
+      }
+      return;
+    }
     await fetchAll();
   }
 
-  async function toggleCanCreateServices(b: Barber) {
+  async function toggleAdmin(b: Barber) {
     await fetch(`/api/gstsantos/barbers/${b.memberId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ canCreateServices: !b.canCreateServices }),
+      body: JSON.stringify({ isAdmin: !b.canCreateServices }),
     });
     await fetchAll();
   }
@@ -114,86 +121,99 @@ export default function BarbersPage() {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {barbers.map((b) => (
-            <div
-              key={b.memberId}
-              style={{
-                background: "#131211",
-                border: "1px solid #2A2620",
-                borderRadius: 12,
-                padding: "14px 18px",
-                display: "flex",
-                alignItems: "center",
-                gap: 14,
-                flexWrap: "wrap",
-              }}
-            >
-              {/* Avatar */}
+          {barbers.map((b) => {
+            const isOwner = b.role === "owner";
+            const isMe = b.userId === me?.id;
+            const isAdminBarber = isOwner || b.canCreateServices;
+
+            return (
               <div
+                key={b.memberId}
                 style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: "50%",
-                  background: "rgba(201,168,76,0.15)",
-                  border: "1px solid rgba(201,168,76,0.3)",
-                  display: "grid",
-                  placeItems: "center",
-                  color: "#C9A84C",
-                  fontWeight: 700,
-                  fontSize: 15,
-                  flexShrink: 0,
+                  background: "#131211",
+                  border: "1px solid #2A2620",
+                  borderRadius: 12,
+                  padding: "14px 18px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 14,
+                  flexWrap: "wrap",
                 }}
               >
-                {initials(b.name)}
-              </div>
-
-              {/* Info */}
-              <div style={{ flex: 1, minWidth: 120 }}>
-                <p style={{ margin: 0, fontWeight: 600, color: "#F4EEDF", fontSize: 14 }}>
-                  {b.name}
-                </p>
-                <p style={{ margin: 0, fontSize: 12, color: "#8A847A" }}>{b.email}</p>
-              </div>
-
-              {/* canCreateServices toggle — owner only */}
-              {me?.role === "owner" && (
-                <label
+                {/* Avatar */}
+                <div
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    cursor: "pointer",
-                    fontSize: 12,
-                    color: "#C8C2B4",
+                    width: 44,
+                    height: 44,
+                    borderRadius: "50%",
+                    background: "rgba(201,168,76,0.15)",
+                    border: "1px solid rgba(201,168,76,0.3)",
+                    display: "grid",
+                    placeItems: "center",
+                    color: "#C9A84C",
+                    fontWeight: 700,
+                    fontSize: 15,
+                    flexShrink: 0,
                   }}
                 >
-                  <ToggleSwitch
-                    checked={b.canCreateServices}
-                    onChange={() => void toggleCanCreateServices(b)}
-                  />
-                  Criar serviços
-                </label>
-              )}
+                  {initials(b.name)}
+                </div>
 
-              {/* Delete — owner only */}
-              {me?.role === "owner" && (
-                <button
-                  onClick={() => void handleDelete(b.memberId)}
-                  style={{
-                    padding: "5px 12px",
-                    border: "1px solid #E5737344",
-                    borderRadius: 999,
-                    background: "#E5737311",
-                    color: "#E57373",
-                    fontSize: 12,
-                    cursor: "pointer",
-                  }}
-                >
-                  Remover
-                </button>
-              )}
-            </div>
-          ))}
+                {/* Info + badge */}
+                <div style={{ flex: 1, minWidth: 120 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <p style={{ margin: 0, fontWeight: 600, color: "#F4EEDF", fontSize: 14 }}>
+                      {b.name}
+                    </p>
+                    {isOwner ? (
+                      <span style={badgeStyle("#C9A84C", "rgba(201,168,76,0.15)")}>Dono</span>
+                    ) : isAdminBarber ? (
+                      <span style={badgeStyle("#7CB9E8", "rgba(124,185,232,0.12)")}>Admin</span>
+                    ) : null}
+                  </div>
+                  <p style={{ margin: 0, fontSize: 12, color: "#8A847A" }}>{b.email}</p>
+                </div>
+
+                {/* "Barbeiro Admin" toggle — owner can toggle members only */}
+                {me?.role === "owner" && !isOwner && (
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      cursor: "pointer",
+                      fontSize: 12,
+                      color: "#C8C2B4",
+                    }}
+                  >
+                    <ToggleSwitch
+                      checked={b.canCreateServices}
+                      onChange={() => void toggleAdmin(b)}
+                    />
+                    Barbeiro Admin
+                  </label>
+                )}
+
+                {/* Delete — owner only, not on self or other owners */}
+                {me?.role === "owner" && !isOwner && !isMe && (
+                  <button
+                    onClick={() => void handleDelete(b.memberId)}
+                    style={{
+                      padding: "5px 12px",
+                      border: "1px solid #E5737344",
+                      borderRadius: 999,
+                      background: "#E5737311",
+                      color: "#E57373",
+                      fontSize: 12,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Remover
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -219,15 +239,15 @@ export default function BarbersPage() {
               borderRadius: 16,
               padding: 28,
               width: "100%",
-              maxWidth: 380,
+              maxWidth: 400,
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ margin: "0 0 20px", color: "#F4EEDF", fontSize: 18 }}>
+            <h2 style={{ margin: "0 0 6px", color: "#F4EEDF", fontSize: 18 }}>
               Adicionar barbeiro
             </h2>
             <p style={{ margin: "0 0 20px", color: "#8A847A", fontSize: 13 }}>
-              Uma senha temporária será gerada e enviada por e-mail.
+              Um link de acesso será enviado por e-mail.
             </p>
 
             <Field label="Nome">
@@ -246,6 +266,23 @@ export default function BarbersPage() {
                 style={inputStyle}
                 placeholder="email@exemplo.com"
               />
+            </Field>
+
+            <Field label="Perfil">
+              <div style={{ display: "flex", gap: 8 }}>
+                <ProfileOption
+                  selected={!form.isAdmin}
+                  onClick={() => setForm((f) => ({ ...f, isAdmin: false }))}
+                  title="Barbeiro"
+                  description="Acessa apenas a própria agenda"
+                />
+                <ProfileOption
+                  selected={form.isAdmin}
+                  onClick={() => setForm((f) => ({ ...f, isAdmin: true }))}
+                  title="Barbeiro Admin"
+                  description="Gerencia serviços e barbeiros"
+                />
+              </div>
             </Field>
 
             <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
@@ -267,13 +304,39 @@ export default function BarbersPage() {
   );
 }
 
-function ToggleSwitch({
-  checked,
-  onChange,
+function ProfileOption({
+  selected,
+  onClick,
+  title,
+  description,
 }: {
-  checked: boolean;
-  onChange: () => void;
+  selected: boolean;
+  onClick: () => void;
+  title: string;
+  description: string;
 }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        flex: 1,
+        padding: "10px 12px",
+        border: selected ? "1.5px solid #C9A84C" : "1.5px solid #2A2620",
+        borderRadius: 10,
+        background: selected ? "rgba(201,168,76,0.08)" : "transparent",
+        cursor: "pointer",
+        transition: "all 0.15s",
+      }}
+    >
+      <p style={{ margin: "0 0 2px", fontSize: 13, fontWeight: 600, color: selected ? "#C9A84C" : "#C8C2B4" }}>
+        {title}
+      </p>
+      <p style={{ margin: 0, fontSize: 11, color: "#8A847A" }}>{description}</p>
+    </div>
+  );
+}
+
+function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () => void }) {
   return (
     <div
       onClick={onChange}
@@ -322,6 +385,18 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       {children}
     </div>
   );
+}
+
+function badgeStyle(color: string, bg: string): React.CSSProperties {
+  return {
+    padding: "1px 8px",
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: 600,
+    color,
+    background: bg,
+    border: `1px solid ${color}44`,
+  };
 }
 
 const inputStyle: React.CSSProperties = {

@@ -18,20 +18,22 @@ export async function PATCH(
 
   const { memberId } = await params;
   const body = await req.json();
-  const { canCreateServices } = body as { canCreateServices?: boolean };
+  // Accept both `isAdmin` (new) and `canCreateServices` (legacy) as the same flag
+  const { isAdmin, canCreateServices } = body as { isAdmin?: boolean; canCreateServices?: boolean };
+  const newValue = isAdmin ?? canCreateServices;
 
-  if (typeof canCreateServices !== "boolean") {
-    return NextResponse.json({ error: "canCreateServices must be a boolean" }, { status: 400 });
+  if (typeof newValue !== "boolean") {
+    return NextResponse.json({ error: "isAdmin must be a boolean" }, { status: 400 });
   }
 
-  // Only owner can change canCreateServices — non-owners with canCreateServices can manage barbers but not grant permissions
+  // Only owner can promote/demote barbers
   if (ctx.role !== "owner") {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
   const [updated] = await db
     .update(member)
-    .set({ canCreateServices })
+    .set({ canCreateServices: newValue })
     .where(and(eq(member.id, memberId), eq(member.organizationId, ctx.orgId)))
     .returning({ id: member.id });
 

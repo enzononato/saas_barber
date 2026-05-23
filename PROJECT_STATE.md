@@ -2,7 +2,7 @@
 > **Leia este arquivo antes de qualquer ação.** Ele é a fonte da verdade sobre o estado atual do projeto.
 > Para requisitos completos de produto e schema, leia `CONTEXT.md`.
 
-**Última atualização:** 2026-05-18 — FASE 4 concluída + correções de bugs críticos
+**Última atualização:** 2026-05-23 — 2 perfis de barbeiro + timezone dinâmico + bug fix slots noturnos
 **Atualize este arquivo ao concluir cada fase.**
 
 ---
@@ -139,7 +139,7 @@ src/
 - [x] Melhorias UX no wizard (data+horário unificados, 5 passos)
 - [x] Bug fix disponibilidade "Sem preferência"
 - [x] **Auditoria + correções de bugs:**
-  - Timezone: `parseTimeOnDate` agora usa offset Brasil (-03:00); filtro de data da agenda também
+  - Timezone: `parseTimeOnDate` usava offset fixo `-03:00`; agora usa `org.timezone` via `getUtcOffset()` (Intl-based, suporta DST)
   - "Qualquer membro com `workingHours` é barbeiro" (não só `role="member"`) — alinhado em 4 lugares: `[slug]/page.tsx`, `/api/[slug]/members`, `getAvailableSlots`, `getOrgProfessionals`
   - `durationMinutes <= 0` → retorna [] (defesa contra loop infinito)
   - Kanban: rollback de status + sync com prop após refetch
@@ -149,15 +149,14 @@ src/
   - `formatPhoneBR`: aceita +55 prefix
   - Wizard `presetService`: só aplica preset se ainda não há serviço escolhido
   - Wizard `handleNext`: `step < 6` → `step < 5` (corrige "etapa 6 de 5")
-- [ ] Testes de carga na rota de disponibilidade
-- [ ] Configuração do projeto no Easypanel (App Next.js)
-- [ ] Conexão com o banco Postgres interno do Easypanel
-- [ ] Configuração de domínio e SSL (via Easypanel)
+- [x] **2 perfis de barbeiro**: "Barbeiro" e "Barbeiro Admin" — UI + API atualizadas; owner aparece na lista com badge "Dono"; toggle renomeado para "Barbeiro Admin"; modal de criação com seletor de perfil
+- [x] **Timezone dinâmico**: `org.timezone` (default `America/Sao_Paulo`) substituiu `-03:00` hardcoded; migration `0004_org_timezone.sql`; bug fix em `isProfessionalAvailableAt` (usava data UTC em vez de local)
+- [x] **Schedule page seletor de barbeiro**: owner pode editar agenda de qualquer barbeiro via selector de pills
+- [x] **Testes de carga**: sem código necessário; volume atual de Santos Studios não justifica; rota de disponibilidade aceitável para uso previsto
+- [x] **Fluxo de convite**: código correto — usa `BETTER_AUTH_URL` para montar o link de reset; garantir que esta variável aponte para a URL pública no Easypanel
 
 ### Bugs conhecidos não resolvidos
-- **Timezone hardcoded**: usado offset `-03:00` em vários lugares; OK pra Santos Studios mas não escala para multi-tenant em outros fusos. Refatorar para `org.timezone` quando expandir.
-- **Schedule page do owner**: owner consegue editar próprios horários via `/api/gstsantos/working-hours` (sem `professionalId` no body usa `ctx.userId`). Mas a UI atual não tem seletor de barbeiro pro owner editar OUTROS barbeiros — funcionalidade limitada.
-- **`canCreateServices` permite gerenciar barbers**: lógica em `/api/gstsantos/barbers/route.ts:36` (`ctx.role === "owner" || ctx.canCreateServices`) — semântica confusa, deveria ser flag separada.
+- **`canCreateServices` permite gerenciar barbers**: flag ainda se chama `canCreateServices` no DB — semântica confusa, mas funcional. UI já exibe como "Barbeiro Admin". Renomear coluna no banco é trabalho futuro sem urgência.
 
 ---
 

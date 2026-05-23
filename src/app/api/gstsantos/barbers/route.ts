@@ -1,8 +1,7 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
-import { sendBarberInviteEmail } from "@/lib/email";
 import { env } from "@/lib/env";
 import { db } from "@/server/db";
 import { member, user } from "@/server/db/schema/auth";
@@ -13,18 +12,20 @@ export async function GET() {
   const ctx = await requireAuth();
   if (!ctx) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
+  // Return ALL members (owners + regular) so both profile types show in the barbers list
   const rows = await db
     .select({
       memberId: member.id,
       userId: user.id,
       name: user.name,
       email: user.email,
+      role: member.role,
       canCreateServices: member.canCreateServices,
       createdAt: member.createdAt,
     })
     .from(member)
     .innerJoin(user, eq(member.userId, user.id))
-    .where(and(eq(member.organizationId, ctx.orgId), eq(member.role, "member")));
+    .where(eq(member.organizationId, ctx.orgId));
 
   return NextResponse.json(rows);
 }
@@ -37,13 +38,12 @@ export async function POST(req: Request) {
   if (!canManageBarbers) return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
   const body = await req.json();
-  const { name, email } = body as { name?: string; email?: string };
+  const { name, email, isAdmin } = body as { name?: string; email?: string; isAdmin?: boolean };
 
   if (!name || !email) {
     return NextResponse.json({ error: "name and email are required" }, { status: 400 });
   }
 
-  // Create user with a random password — the barber will set their own via the invite link
   const tempPassword = crypto.randomUUID();
   const signUpRes = await auth.api.signUpEmail({
     body: { name, email, password: tempPassword },
@@ -63,11 +63,10 @@ export async function POST(req: Request) {
     organizationId: org.id,
     userId: newUserId,
     role: "member",
-    canCreateServices: false,
+    canCreateServices: isAdmin ?? false,
     createdAt: new Date(),
   });
 
-  // Trigger the "set your password" email via Better Auth's reset flow
   const setupPage = `${env.BETTER_AUTH_URL}/gstsantos/reset-password`;
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -75,7 +74,6 @@ export async function POST(req: Request) {
       body: { email, redirectTo: setupPage },
     });
   } catch (err) {
-    // Log but don't fail — admin can resend later
     console.error("[INVITE] requestPasswordReset failed:", err);
   }
 

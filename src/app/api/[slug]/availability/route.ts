@@ -46,7 +46,7 @@ export async function GET(
     return NextResponse.json({ error: "service_not_found" }, { status: 404 });
   }
 
-  const slots = await getAvailableSlots(org.id, memberId, svcRows[0].durationMinutes, date);
+  const slots = await getAvailableSlots(org.id, memberId, svcRows[0].durationMinutes, date, org.timezone);
 
   return NextResponse.json({
     slots: slots.map((s) => ({

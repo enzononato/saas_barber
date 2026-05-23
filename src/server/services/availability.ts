@@ -10,19 +10,35 @@ export interface Slot {
   endsAt: Date;
 }
 
-// America/Sao_Paulo offset (Brazil aboliu horário de verão em 2019, então é fixo)
-const TZ_OFFSET = "-03:00";
+// Returns the UTC offset string (e.g. "-03:00") for a given timezone at a specific date.
+// Uses Intl so DST-aware timezones are handled correctly.
+export function getUtcOffset(timezone: string, nearDate: Date): string {
+  const formatter = new Intl.DateTimeFormat("en", {
+    timeZone: timezone,
+    timeZoneName: "shortOffset",
+  });
+  const raw =
+    formatter.formatToParts(nearDate).find((p) => p.type === "timeZoneName")?.value ?? "GMT";
+  // raw examples: "GMT-3", "GMT+5:30", "GMT"
+  if (raw === "GMT") return "+00:00";
+  const m = raw.match(/GMT([+-])(\d+)(?::(\d+))?/);
+  if (!m) return "+00:00";
+  return `${m[1]}${m[2].padStart(2, "0")}:${(m[3] ?? "00").padStart(2, "0")}`;
+}
 
-function parseTimeOnDate(timeStr: string, dateStr: string): Date {
+function parseTimeOnDate(timeStr: string, dateStr: string, timezone: string): Date {
   const [h, m] = timeStr.split(":").map(Number);
+  const nearDate = new Date(`${dateStr}T12:00:00Z`);
+  const offset = getUtcOffset(timezone, nearDate);
   return new Date(
-    `${dateStr}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00.000${TZ_OFFSET}`,
+    `${dateStr}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00.000${offset}`,
   );
 }
 
-// Local day boundaries (Brazil) converted to UTC instants
-function dayBoundariesUtc(dateStr: string): { start: Date; end: Date } {
-  const start = new Date(`${dateStr}T00:00:00.000${TZ_OFFSET}`);
+function dayBoundariesUtc(dateStr: string, timezone: string): { start: Date; end: Date } {
+  const nearDate = new Date(`${dateStr}T12:00:00Z`);
+  const offset = getUtcOffset(timezone, nearDate);
+  const start = new Date(`${dateStr}T00:00:00.000${offset}`);
   const end = new Date(start.getTime() + 86_400_000);
   return { start, end };
 }
@@ -36,13 +52,15 @@ export async function getSlotsForProfessional(
   professionalId: string,
   durationMinutes: number,
   date: string,
+  timezone: string,
 ): Promise<Slot[]> {
   if (durationMinutes <= 0) return [];
-  // Day of week in Brazil local time
-  const dayOfWeek = new Date(`${date}T12:00:00${TZ_OFFSET}`).getUTCDay();
-  const { start: dayStart, end: dayEnd } = dayBoundariesUtc(date);
 
-  // 1. Horários padrão do profissional neste dia da semana
+  const nearDate = new Date(`${date}T12:00:00Z`);
+  const offset = getUtcOffset(timezone, nearDate);
+  const dayOfWeek = new Date(`${date}T12:00:00${offset}`).getUTCDay();
+  const { start: dayStart, end: dayEnd } = dayBoundariesUtc(date, timezone);
+
   const hours = await db
     .select({ startTime: workingHours.startTime, endTime: workingHours.endTime })
     .from(workingHours)
@@ -57,10 +75,9 @@ export async function getSlotsForProfessional(
 
   if (hours.length === 0) return [];
 
-  const workStart = parseTimeOnDate(hours[0].startTime, date);
-  const workEnd = parseTimeOnDate(hours[0].endTime, date);
+  const workStart = parseTimeOnDate(hours[0].startTime, date, timezone);
+  const workEnd = parseTimeOnDate(hours[0].endTime, date, timezone);
 
-  // 2. Gera todos os slots candidatos dentro do horário de trabalho
   const candidates: Slot[] = [];
   let cursor = workStart;
   while (true) {
@@ -71,7 +88,6 @@ export async function getSlotsForProfessional(
   }
   if (candidates.length === 0) return [];
 
-  // 3. Exceções de horário que intersectam com o dia
   const exceptions = await db
     .select({ startsAt: timeExceptions.startsAt, endsAt: timeExceptions.endsAt })
     .from(timeExceptions)
@@ -84,7 +100,6 @@ export async function getSlotsForProfessional(
       ),
     );
 
-  // 4. Agendamentos ativos que intersectam com o dia
   const busy = await db
     .select({ startsAt: appointments.startsAt, endsAt: appointments.endsAt })
     .from(appointments)
@@ -103,10 +118,8 @@ export async function getSlotsForProfessional(
     end: new Date(b.endsAt),
   }));
 
-  // 5. Filtra slots que colidem com qualquer bloqueio
   return candidates.filter(
-    (slot) =>
-      !blocked.some((b) => overlaps(slot.startsAt, slot.endsAt, b.start, b.end)),
+    (slot) => !blocked.some((b) => overlaps(slot.startsAt, slot.endsAt, b.start, b.end)),
   );
 }
 
@@ -115,9 +128,12 @@ export async function isProfessionalAvailableAt(
   professionalId: string,
   startsAt: Date,
   endsAt: Date,
+  timezone: string,
 ): Promise<boolean> {
-  const date = startsAt.toISOString().slice(0, 10);
-  const dayOfWeek = new Date(`${date}T12:00:00Z`).getUTCDay();
+  // Use local date (not UTC) to avoid off-by-one for late-night slots
+  const date = startsAt.toLocaleDateString("sv-SE", { timeZone: timezone });
+  const offset = getUtcOffset(timezone, startsAt);
+  const dayOfWeek = new Date(`${date}T12:00:00${offset}`).getUTCDay();
 
   const hours = await db
     .select({ startTime: workingHours.startTime, endTime: workingHours.endTime })
@@ -133,8 +149,8 @@ export async function isProfessionalAvailableAt(
 
   if (hours.length === 0) return false;
 
-  const workStart = parseTimeOnDate(hours[0].startTime, date);
-  const workEnd = parseTimeOnDate(hours[0].endTime, date);
+  const workStart = parseTimeOnDate(hours[0].startTime, date, timezone);
+  const workEnd = parseTimeOnDate(hours[0].endTime, date, timezone);
   if (startsAt < workStart || endsAt > workEnd) return false;
 
   const blockedByException = await db
@@ -174,9 +190,10 @@ export async function getAvailableSlots(
   memberId: string,
   durationMinutes: number,
   date: string,
+  timezone: string,
 ): Promise<Slot[]> {
   if (memberId !== "any") {
-    return getSlotsForProfessional(orgId, memberId, durationMinutes, date);
+    return getSlotsForProfessional(orgId, memberId, durationMinutes, date, timezone);
   }
 
   const professionals = await db
@@ -202,7 +219,7 @@ export async function getAvailableSlots(
 
   const slotMap = new Map<number, Slot>();
   for (const p of professionals) {
-    const slots = await getSlotsForProfessional(orgId, p.userId, durationMinutes, date);
+    const slots = await getSlotsForProfessional(orgId, p.userId, durationMinutes, date, timezone);
     for (const s of slots) {
       slotMap.set(s.startsAt.getTime(), s);
     }

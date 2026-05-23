@@ -7,11 +7,17 @@ export type OrgRecord = {
   id: string;
   name: string;
   slug: string | null;
+  timezone: string;
 };
 
 export async function getOrgBySlug(slug: string): Promise<OrgRecord | null> {
   const rows = await db
-    .select({ id: organization.id, name: organization.name, slug: organization.slug })
+    .select({
+      id: organization.id,
+      name: organization.name,
+      slug: organization.slug,
+      timezone: organization.timezone,
+    })
     .from(organization)
     .where(eq(organization.slug, slug))
     .limit(1);

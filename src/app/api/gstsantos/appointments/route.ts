@@ -3,8 +3,9 @@ import { NextResponse } from "next/server";
 
 import { db } from "@/server/db";
 import { appointments } from "@/server/db/schema/appointments";
-import { user } from "@/server/db/schema/auth";
+import { organization, user } from "@/server/db/schema/auth";
 import { requireAuth } from "@/server/middleware/requireAuth";
+import { getUtcOffset } from "@/server/services/availability";
 
 export async function GET(req: Request) {
   const ctx = await requireAuth();
@@ -25,8 +26,15 @@ export async function GET(req: Request) {
   }
 
   if (date) {
-    // Brazil local day → UTC (no DST since 2019)
-    const start = new Date(date + "T00:00:00-03:00");
+    const orgRow = await db
+      .select({ timezone: organization.timezone })
+      .from(organization)
+      .where(eq(organization.id, ctx.orgId))
+      .limit(1);
+    const timezone = orgRow[0]?.timezone ?? "America/Sao_Paulo";
+    const nearDate = new Date(`${date}T12:00:00Z`);
+    const offset = getUtcOffset(timezone, nearDate);
+    const start = new Date(`${date}T00:00:00${offset}`);
     const end = new Date(start.getTime() + 86_400_000 - 1);
     conditions.push(gte(appointments.startsAt, start));
     conditions.push(lte(appointments.startsAt, end));

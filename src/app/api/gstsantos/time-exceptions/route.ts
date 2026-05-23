@@ -6,34 +6,30 @@ import { appointments } from "@/server/db/schema";
 import { timeExceptions } from "@/server/db/schema/availability";
 import { requireAuth } from "@/server/middleware/requireAuth";
 
-export async function GET() {
+export async function GET(req: Request) {
   const ctx = await requireAuth();
   if (!ctx) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
+  const { searchParams } = new URL(req.url);
+  const profIdParam = searchParams.get("professionalId");
+
+  // Owner can query any professional; member is always scoped to self
+  const targetUserId =
+    ctx.role === "owner" && profIdParam ? profIdParam : ctx.userId;
+
   const now = new Date();
 
-  const rows = ctx.role === "owner"
-    ? await db
-        .select()
-        .from(timeExceptions)
-        .where(
-          and(
-            eq(timeExceptions.organizationId, ctx.orgId),
-            gt(timeExceptions.startsAt, now),
-          ),
-        )
-        .orderBy(timeExceptions.startsAt)
-    : await db
-        .select()
-        .from(timeExceptions)
-        .where(
-          and(
-            eq(timeExceptions.organizationId, ctx.orgId),
-            eq(timeExceptions.professionalId, ctx.userId),
-            gt(timeExceptions.startsAt, now),
-          ),
-        )
-        .orderBy(timeExceptions.startsAt);
+  const rows = await db
+    .select()
+    .from(timeExceptions)
+    .where(
+      and(
+        eq(timeExceptions.organizationId, ctx.orgId),
+        eq(timeExceptions.professionalId, targetUserId),
+        gt(timeExceptions.startsAt, now),
+      ),
+    )
+    .orderBy(timeExceptions.startsAt);
 
   return NextResponse.json(rows);
 }

@@ -59,6 +59,7 @@ export const organization = pgTable("organization", {
   logo: text("logo"),
   createdAt: timestamp("createdAt", { withTimezone: true }).notNull(),
   metadata: text("metadata"),
+  timezone: text("timezone").notNull().default("America/Sao_Paulo"),
 });
 
 export const member = pgTable("member", {
