@@ -3,6 +3,9 @@
     "additionalDirectories": [
       "C:\\Users\\enzo.jz\\Documents\\dev projects\\SaaS barber\\src\\app\\gstsantos\\agenda\\_components",
       "c:\\Users\\enzo.jz\\Documents\\dev projects\\SaaS barber\\src\\app\\icons"
+    ],
+    "allow": [
+      "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\(JSON.stringify\\(p.scripts, null, 2\\)\\)\")"
     ]
   }
 }
