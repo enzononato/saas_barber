@@ -9,6 +9,7 @@ const authClient = createAuthClient({ baseURL: typeof window !== "undefined" ? w
 
 const NAV_ITEMS = [
   { href: "/gstsantos/agenda", label: "Agenda", icon: "📅" },
+  { href: "/gstsantos/customers", label: "Clientes", icon: "👥" },
   { href: "/gstsantos/financial", label: "Financeiro", icon: "💰" },
   { href: "/gstsantos/services", label: "Serviços", icon: "✂️" },
   { href: "/gstsantos/schedule", label: "Minha Agenda", icon: "🗓" },
@@ -27,6 +28,9 @@ export function SidebarNav({ role, canManageBarbers }: Props) {
     ...NAV_ITEMS,
     ...(canManageBarbers
       ? [{ href: "/gstsantos/barbers", label: "Barbeiros", icon: "👤" }]
+      : []),
+    ...(role === "owner"
+      ? [{ href: "/gstsantos/whatsapp", label: "WhatsApp", icon: "💬" }]
       : []),
   ];
 

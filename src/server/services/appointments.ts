@@ -60,7 +60,15 @@ export type CreateAppointmentParams = {
 };
 
 export type CreateAppointmentResult =
-  | { ok: true; appointment: { id: string; startsAt: Date; endsAt: Date } }
+  | {
+      ok: true;
+      appointment: {
+        id: string;
+        startsAt: Date;
+        endsAt: Date;
+        professionalId: string;
+      };
+    }
   | { ok: false; error: "slot_unavailable" | "no_professional_available" };
 
 export async function createAppointment(
@@ -87,6 +95,7 @@ export async function createAppointment(
         id: appointments.id,
         startsAt: appointments.startsAt,
         endsAt: appointments.endsAt,
+        professionalId: appointments.professionalId,
       });
 
     return { ok: true, appointment: created };

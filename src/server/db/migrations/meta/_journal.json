@@ -29,6 +29,27 @@
       "when": 1778906481620,
       "tag": "0003_peaceful_big_bertha",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1779624000000,
+      "tag": "0004_org_timezone",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779710400000,
+      "tag": "0005_whatsapp_and_push",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1779796800000,
+      "tag": "0006_customers_and_evolution",
+      "breakpoints": true
     }
   ]
 }

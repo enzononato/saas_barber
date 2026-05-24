@@ -2,7 +2,7 @@
 > **Leia este arquivo antes de qualquer ação.** Ele é a fonte da verdade sobre o estado atual do projeto.
 > Para requisitos completos de produto e schema, leia `CONTEXT.md`.
 
-**Última atualização:** 2026-05-23 — 2 perfis de barbeiro + timezone dinâmico + bug fix slots noturnos
+**Última atualização:** 2026-05-23 — Provisionamento 1-click WhatsApp (QR code) + Página de Clientes (CRM)
 **Atualize este arquivo ao concluir cada fase.**
 
 ---
@@ -154,6 +154,122 @@ src/
 - [x] **Schedule page seletor de barbeiro**: owner pode editar agenda de qualquer barbeiro via selector de pills
 - [x] **Testes de carga**: sem código necessário; volume atual de Santos Studios não justifica; rota de disponibilidade aceitável para uso previsto
 - [x] **Fluxo de convite**: código correto — usa `BETTER_AUTH_URL` para montar o link de reset; garantir que esta variável aponte para a URL pública no Easypanel
+
+### FASE 6 — Engajamento (WhatsApp + Push) · `✅ CONCLUÍDA`
+**Responsável:** Claude Opus
+
+**Migration `0005_whatsapp_and_push.sql`** — 3 tabelas novas:
+- [x] `push_subscriptions` (N por user — multi-device, endpoint UNIQUE, p256dh/auth)
+- [x] `whatsapp_settings` (1:1 com org — apiUrl/apiKey/instanceName, templates default em pt-BR, followUpDays)
+- [x] `follow_up_log` (dedup — não reenvia para mesmo telefone em janela de `followUpDays`)
+
+**Push Notifications (PWA):**
+- [x] `web-push` instalado + VAPID keys geradas (`.env` e `.env.example` atualizados)
+- [x] `src/server/services/push.ts` — `sendPushToUser()` com cleanup automático de 410/404
+- [x] `src/app/api/gstsantos/push/vapid-key/route.ts` — expõe chave pública
+- [x] `src/app/api/gstsantos/push/subscribe/route.ts` — POST (upsert) + DELETE
+- [x] `src/app/sw.ts` — handlers `push` e `notificationclick` (abre `/gstsantos/agenda` ou foca janela existente)
+- [x] `src/components/PushPrompt.tsx` — banner discreto pedindo permissão; auto-resubscribe se permissão já concedida; dismiss persiste no localStorage
+- [x] Mounted em `(protected)/layout.tsx`
+
+**WhatsApp (Evolution API):**
+- [x] `src/server/services/whatsapp.ts` — `normalizePhoneBR()`, `sendBookingConfirmationIfEnabled()`, `sendTestMessage()`, `triggerFollowUpForOrg()` com SQL `MAX(starts_at) GROUP BY phone` + dedup via `follow_up_log`
+- [x] `src/app/api/gstsantos/whatsapp/settings/route.ts` — GET + POST (owner only, upsert)
+- [x] `src/app/api/gstsantos/whatsapp/test/route.ts` — envia mensagem de teste
+- [x] `src/app/api/gstsantos/whatsapp/trigger-followup/route.ts` — dual auth: `Bearer CRON_SECRET` (cron) ou sessão owner (painel)
+- [x] `src/app/gstsantos/(protected)/whatsapp/page.tsx` — UI completa: conexão, automações, templates com variáveis, botão de teste, botão "disparar agora"
+- [x] SidebarNav adiciona "WhatsApp" (owner only)
+
+**Disparo unificado em `src/app/api/[slug]/appointments/route.ts`:**
+- [x] Após `result.ok` → `void notifyAfterBooking({...})` (não-bloqueante)
+- [x] Busca nome do profissional uma única vez; dispara push + WhatsApp em paralelo lógico (await dentro de try-catch isolado)
+- [x] `createAppointment().appointment` agora inclui `professionalId` no retorno — necessário pra resolver o caso `memberId === "any"`
+
+**Env vars novas (`src/lib/env.ts`):**
+- [x] `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY` (todos opcionais — sistema gracefully skip push se não configurado)
+- [x] `CRON_SECRET` opcional
+
+**`npx tsc --noEmit`:** ✅ zero erros
+
+### Pendências de deploy (EasyPanel)
+- **Adicionar env vars de produção:** as 4 VAPID + `CRON_SECRET` (gere com `openssl rand -hex 32`)
+- **Rodar migração:** `npm run db:migrate` na primeira inicialização do container já cria as 3 tabelas (idempotente — todas usam `IF NOT EXISTS`)
+- **(Opcional) Cron de follow-up:** EasyPanel → Cron Jobs → diariamente 9h → `curl -X POST https://seudominio.com/api/gstsantos/whatsapp/trigger-followup -H "Authorization: Bearer $CRON_SECRET"`
+
+### FASE 7 — Provisionamento WhatsApp 1-click + CRM Clientes · `✅ CONCLUÍDA`
+**Responsável:** Claude Opus
+
+**Migration `0006_customers_and_evolution.sql`:**
+- [x] `customers` (id, org, phone normalizado, name, notes, tags text[], is_blocked, first/last_seen_at) com UNIQUE (org, phone)
+- [x] Índices em `customers (org, name)` e `customers (org, last_seen_at)`
+- [x] Índice em `appointments (org, customer_phone, starts_at)` pra queries de histórico
+- [x] Colunas novas em `whatsapp_settings`: `connection_status`, `connected_number`, `last_sync_at`
+
+**Evolution Service (`src/server/services/evolution.ts`):**
+- [x] Wrapper completo da Evolution API v2: `ensureInstance` (idempotente), `getQrCode`, `getConnectionState`, `getInstanceInfo`, `logoutInstance`, `deleteInstance`, `sendText`
+- [x] Helper `instanceNameForSlug` — gera nome seguro a partir do slug da org
+- [x] Credenciais globais via env: `EVOLUTION_API_URL` + `EVOLUTION_API_KEY` — owner nunca vê
+- [x] Todas as funções resilientes (logam erro, retornam neutro — nunca lançam)
+
+**API Routes Evolution (`/api/gstsantos/whatsapp/`):**
+- [x] `POST /connect` — `ensureInstance` → `getQrCode` → status=connecting → retorna { qrcode, instanceName }
+- [x] `GET /status` — sincroniza com Evolution → persiste no banco → retorna estado atualizado
+- [x] `GET /qrcode` — refetch do QR (botão "Gerar novo QR")
+- [x] `POST /disconnect` — `logoutInstance` + status=disconnected
+- [x] `POST /test` — agora usa `instanceName` da org (não exige mais URL/key no body)
+- [x] `GET/POST /settings` — apenas isEnabled, followUpDays, templates (sem mais URL/key)
+
+**Página `/gstsantos/whatsapp` reescrita:**
+- [x] Card de status: ⚪ Desconectado (com botão "Conectar WhatsApp") OU 🟢 Conectado · +55... (com Desconectar e Verificar status)
+- [x] Modal QR Code: imagem renderizada do base64, timer regressivo 60s, polling `/status` a cada 2.5s
+- [x] Botão "Gerar novo QR" pra refetch
+- [x] Auto-fecha modal + toast quando status === "connected"
+
+**Customers Service (`src/server/services/customers.ts`):**
+- [x] `upsertCustomer` — ON CONFLICT (org, phone) com `LEAST(first_seen_at, $new)` / `GREATEST(last_seen_at, $new)`
+- [x] `listCustomers` — agregação em subquery, filtros (search ILIKE name OR phone, tag via @>, scopeUserId para barbeiros), ordenação (lastVisit/name/totalSpent/totalVisits), paginação
+- [x] `getCustomerAnalytics` — 8 queries: counts por status, datas chave, top 3 barbeiros, top 3 serviços, horário preferido (bucket manhã/tarde/noite), dia da semana preferido, frequência mensal últimos 12m, frequência média entre cortes
+- [x] `getCustomerAppointments` — histórico paginado com filtro de scope
+- [x] `loyaltyTierForVisits` em `customers.ts` schema: novo (1) · recorrente (2-4) · fiel (5-14) · vip (15+)
+
+**API Routes Customers (`/api/gstsantos/customers/`):**
+- [x] `GET /` — lista com filtros + scope para barbeiros
+- [x] `GET /[id]` — detalhe com analytics + scope check (barbeiro precisa ter atendido o cliente)
+- [x] `PATCH /[id]` — owner only, atualiza name/notes/tags/isBlocked
+- [x] `GET /[id]/appointments` — histórico paginado com scope
+
+**Página `/gstsantos/customers/page.tsx`:**
+- [x] Header com busca (debounce 300ms) + ordenação
+- [x] Filtros chip por tier (Todos / Novo / Recorrente / Fiel / VIP)
+- [x] Lista de cards com avatar (iniciais), nome, telefone formatado, badge de tier, tags, badge bloqueado, métricas (N cortes · R$ X · há Yd)
+
+**Página `/gstsantos/customers/[id]/page.tsx`:**
+- [x] Header: avatar grande, nome, telefone, tier badge, badge bloqueado, "cliente desde", botão Bloquear/Desbloquear (owner only)
+- [x] Tags editáveis (owner only): chips removíveis + input "+tag" com Enter
+- [x] 5 KPIs: cortes, total gasto, frequência média, taxa de faltas (vermelha se >20%), tier
+- [x] Banner azul "Próximo agendamento: ..." se houver SCHEDULED futuro
+- [x] Análises em grid: Barbeiro favorito (rank bar), Serviço favorito, Preferências (horário + dia da semana), Frequência mensal (Recharts LineChart 12m)
+- [x] Notas privadas (owner only): textarea com auto-save onBlur
+- [x] Histórico: lista de appointments com status badge colorido + preço
+
+**Wiring no booking (`/api/[slug]/appointments`):**
+- [x] Normaliza phone (`normalizePhoneBR`)
+- [x] `upsertCustomer` antes do INSERT do appointment
+- [x] Bloqueia booking se `customer.isBlocked` → 403
+- [x] Grava `customerPhone` normalizado no appointment (não o bruto)
+
+**Backfill (`src/server/db/scripts/backfill-customers.ts`):**
+- [x] Script idempotente: lê todos appointments → normaliza phones → UPDATE divergentes → agrupa por (org, phone) → UPSERT em customers com MIN(first_seen) / MAX(last_seen)
+- [x] `package.json` ganhou script `db:backfill-customers`
+
+**SidebarNav:** item "Clientes" 👥 acessível pra owner e barbeiros
+
+**`npx tsc --noEmit`:** ✅ zero erros
+
+### Pendências de deploy (EasyPanel) — adicionais da Fase 7
+- **Env vars novas:** `EVOLUTION_API_URL` (sua Evolution na VPS) + `EVOLUTION_API_KEY` (master key)
+- **Migration 0006:** roda automaticamente no `npm run db:migrate`
+- **Backfill one-time:** rodar `npm run db:backfill-customers` em produção uma única vez para popular clientes a partir do histórico existente
 
 ### Bugs conhecidos não resolvidos
 - **`canCreateServices` permite gerenciar barbers**: flag ainda se chama `canCreateServices` no DB — semântica confusa, mas funcional. UI já exibe como "Barbeiro Admin". Renomear coluna no banco é trabalho futuro sem urgência.

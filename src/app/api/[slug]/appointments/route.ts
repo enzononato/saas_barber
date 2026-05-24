@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { services } from "@/server/db/schema";
+import { user } from "@/server/db/schema/auth";
 import { createAppointmentSchema } from "@/lib/validators/booking";
 import {
   createAppointment,
@@ -10,6 +11,12 @@ import {
 } from "@/server/services/appointments";
 import { isProfessionalAvailableAt } from "@/server/services/availability";
 import { getOrgBySlug } from "@/server/services/tenant";
+import { sendPushToUser } from "@/server/services/push";
+import {
+  normalizePhoneBR,
+  sendBookingConfirmationIfEnabled,
+} from "@/server/services/whatsapp";
+import { upsertCustomer } from "@/server/services/customers";
 
 export async function POST(
   req: NextRequest,
@@ -37,8 +44,8 @@ export async function POST(
     );
   }
 
-  const { serviceId, memberId, startsAt: startsAtStr, clientName, clientPhone, notes } =
-    parsed.data;
+  const { serviceId, memberId, startsAt: startsAtStr, clientName, notes } = parsed.data;
+  const normalizedPhone = normalizePhoneBR(parsed.data.clientPhone);
 
   // Busca o serviço para capturar o snapshot de nome e preço
   const svcRows = await db
@@ -64,6 +71,18 @@ export async function POST(
   const svc = svcRows[0];
   const startsAt = new Date(startsAtStr);
 
+  // Upsert do cliente + checa bloqueio
+  const customer = await upsertCustomer({
+    orgId: org.id,
+    phone: normalizedPhone,
+    name: clientName,
+    appointmentDate: startsAt,
+  });
+
+  if (customer.isBlocked) {
+    return NextResponse.json({ error: "customer_blocked" }, { status: 403 });
+  }
+
   const appointmentParams = {
     serviceId,
     serviceNameAtBooking: svc.name,
@@ -71,15 +90,20 @@ export async function POST(
     durationMinutes: svc.durationMinutes,
     startsAt,
     clientName,
-    clientPhone,
+    clientPhone: normalizedPhone,
     notes,
   };
 
   // Para barbeiro específico, validar working_hours/exceptions antes do INSERT
-  // (Exclusion Constraint só pega overlap entre appointments, não slot fora do expediente)
   if (memberId !== "any") {
     const endsAt = new Date(startsAt.getTime() + svc.durationMinutes * 60_000);
-    const available = await isProfessionalAvailableAt(org.id, memberId, startsAt, endsAt, org.timezone);
+    const available = await isProfessionalAvailableAt(
+      org.id,
+      memberId,
+      startsAt,
+      endsAt,
+      org.timezone,
+    );
     if (!available) {
       return NextResponse.json({ error: "slot_unavailable" }, { status: 409 });
     }
@@ -95,6 +119,18 @@ export async function POST(
     return NextResponse.json({ error: result.error }, { status });
   }
 
+  // Notificações pós-booking (não-bloqueantes): push para o barbeiro + WhatsApp para o cliente.
+  void notifyAfterBooking({
+    orgId: org.id,
+    timezone: org.timezone,
+    professionalId: result.appointment.professionalId,
+    appointmentId: result.appointment.id,
+    startsAt: result.appointment.startsAt,
+    customerName: clientName,
+    customerPhone: normalizedPhone,
+    serviceName: svc.name,
+  });
+
   return NextResponse.json(
     {
       appointment: {
@@ -105,4 +141,57 @@ export async function POST(
     },
     { status: 201 },
   );
+}
+
+type NotifyParams = {
+  orgId: string;
+  timezone: string;
+  professionalId: string;
+  appointmentId: string;
+  startsAt: Date;
+  customerName: string;
+  customerPhone: string;
+  serviceName: string;
+};
+
+async function notifyAfterBooking(p: NotifyParams): Promise<void> {
+  try {
+    const [prof] = await db
+      .select({ name: user.name })
+      .from(user)
+      .where(eq(user.id, p.professionalId))
+      .limit(1);
+    const professionalName = prof?.name ?? "Profissional";
+
+    const timeStr = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: p.timezone,
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(p.startsAt);
+
+    const dateStr = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: p.timezone,
+      day: "2-digit",
+      month: "2-digit",
+    }).format(p.startsAt);
+
+    await sendPushToUser(p.professionalId, {
+      title: "Novo agendamento",
+      body: `${p.customerName} — ${dateStr} às ${timeStr} (${p.serviceName})`,
+      url: "/gstsantos/agenda",
+      tag: `appointment-${p.appointmentId}`,
+    });
+
+    await sendBookingConfirmationIfEnabled({
+      orgId: p.orgId,
+      customerPhone: p.customerPhone,
+      customerName: p.customerName,
+      startsAt: p.startsAt,
+      timezone: p.timezone,
+      serviceNameAtBooking: p.serviceName,
+      professionalName,
+    });
+  } catch (err) {
+    console.error("[appointments] notifyAfterBooking error:", err);
+  }
 }

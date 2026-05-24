@@ -12,7 +12,8 @@
     "db:migrate": "tsx src/server/db/migrate.ts",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx src/server/db/seed.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:backfill-customers": "tsx src/server/db/scripts/backfill-customers.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -28,6 +29,7 @@
     "recharts": "^3.8.1",
     "resend": "^6.12.3",
     "serwist": "^9.5.11",
+    "web-push": "^3.6.7",
     "zod": "^3.23.0"
   },
   "devDependencies": {
@@ -37,6 +39,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/recharts": "^1.8.29",
+    "@types/web-push": "^3.6.4",
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.0",
     "postcss": "^8.4.0",

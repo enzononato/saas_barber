@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { SidebarNav } from "../_components/SidebarNav";
 import { requireAuth } from "@/server/middleware/requireAuth";
+import { PushPrompt } from "@/components/PushPrompt";
 
 export default async function GstLayout({ children }: { children: React.ReactNode }) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -34,6 +35,7 @@ export default async function GstLayout({ children }: { children: React.ReactNod
       >
         {children}
       </main>
+      <PushPrompt />
     </div>
   );
 }
