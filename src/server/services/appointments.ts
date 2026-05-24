@@ -12,7 +12,6 @@ export type Professional = {
 };
 
 export async function getOrgProfessionals(orgId: string): Promise<Professional[]> {
-  // Qualquer membro com workingHours configurado é bookable (inclui owner que atende)
   return db
     .select({ userId: member.userId, name: user.name })
     .from(member)
@@ -20,6 +19,7 @@ export async function getOrgProfessionals(orgId: string): Promise<Professional[]
     .where(
       and(
         eq(member.organizationId, orgId),
+        eq(member.isBarber, true),
         exists(
           db
             .select({ id: workingHours.id })

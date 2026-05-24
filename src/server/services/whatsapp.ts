@@ -29,6 +29,12 @@ function applyTemplate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? "");
 }
 
+function randomDelay(minMs: number, maxMs: number): number {
+  return Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
+}
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 export async function getWhatsappSettings(orgId: string) {
   const [row] = await db
     .select()
@@ -97,7 +103,7 @@ export async function sendBookingConfirmationIfEnabled(
     servico: params.serviceNameAtBooking,
   });
 
-  return sendText(settings.instanceName!, params.customerPhone, text);
+  return sendText(settings.instanceName!, params.customerPhone, text, randomDelay(3000, 12000));
 }
 
 /**
@@ -112,6 +118,7 @@ export async function sendTestMessage(params: {
     params.instanceName,
     normalizePhoneBR(params.number),
     params.text ?? "Mensagem de teste — Santos Studios ✂️",
+    5000,
   );
 }
 
@@ -176,7 +183,7 @@ export async function triggerFollowUpForOrg(
       link,
     });
 
-    const ok = await sendText(settings.instanceName!, row.phone, text);
+    const ok = await sendText(settings.instanceName!, row.phone, text, randomDelay(3000, 6000));
 
     if (ok) {
       await db.insert(followUpLog).values({
@@ -187,6 +194,9 @@ export async function triggerFollowUpForOrg(
     } else {
       skipped++;
     }
+
+    // Pausa entre clientes para evitar envio em rajada (comportamento não-humano)
+    await sleep(randomDelay(8000, 20000));
   }
 
   return { sent, skipped };

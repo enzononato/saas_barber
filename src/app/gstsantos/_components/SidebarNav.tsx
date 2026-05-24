@@ -7,25 +7,26 @@ import { useRouter } from "next/navigation";
 
 const authClient = createAuthClient({ baseURL: typeof window !== "undefined" ? window.location.origin : "" });
 
-const NAV_ITEMS = [
+const BASE_NAV_ITEMS = [
   { href: "/gstsantos/agenda", label: "Agenda", icon: "📅" },
   { href: "/gstsantos/customers", label: "Clientes", icon: "👥" },
   { href: "/gstsantos/financial", label: "Financeiro", icon: "💰" },
   { href: "/gstsantos/services", label: "Serviços", icon: "✂️" },
-  { href: "/gstsantos/schedule", label: "Minha Agenda", icon: "🗓" },
 ];
 
 interface Props {
   role: "owner" | "member";
   canManageBarbers: boolean;
+  isBarber: boolean;
 }
 
-export function SidebarNav({ role, canManageBarbers }: Props) {
+export function SidebarNav({ role, canManageBarbers, isBarber }: Props) {
   const pathname = usePathname();
   const router = useRouter();
 
   const items = [
-    ...NAV_ITEMS,
+    ...BASE_NAV_ITEMS,
+    ...(isBarber ? [{ href: "/gstsantos/schedule", label: "Minha Agenda", icon: "🗓" }] : []),
     ...(canManageBarbers
       ? [{ href: "/gstsantos/barbers", label: "Barbeiros", icon: "👤" }]
       : []),

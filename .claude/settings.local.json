@@ -13,7 +13,9 @@
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\enzo.jz\\\\Documents\\\\dev projects\\\\SaaS barber\\\\src\\\\app\\\\gstsantos\\\\\\(protected\\)\" -Directory)",
       "Bash(Select-Object Name)",
       "Bash(ls -la \"c:\\\\\\\\Users\\\\\\\\enzo.jz\\\\\\\\Documents\\\\\\\\dev projects\\\\\\\\SaaS barber\\\\\\\\src\\\\\\\\app\\\\\\\\gstsantos\\\\\\\\\\(protected\\)\\\\\\\\\")",
-      "Bash(npx web-push *)"
+      "Bash(npx web-push *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\enzo.jz\\\\Documents\\\\dev projects\\\\SaaS barber\" -Directory)",
+      "Bash(findstr \"appointments\")"
     ]
   }
 }

@@ -7,15 +7,22 @@ interface Barber {
   userId: string;
   name: string;
   email: string;
-  role: string;
-  canCreateServices: boolean;
+  role: "owner" | "member";
+  isBarber: boolean;
+  hasWorkingHours: boolean;
   createdAt: string;
 }
 
 interface Me {
   id: string;
   role: "owner" | "member";
-  canCreateServices: boolean;
+  isBarber: boolean;
+}
+
+interface CreatedCredentials {
+  name: string;
+  email: string;
+  tempPassword: string;
 }
 
 function initials(name: string) {
@@ -31,8 +38,10 @@ export default function BarbersPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", isAdmin: false });
+  const [form, setForm] = useState({ name: "", email: "", role: "member" as "owner" | "member" });
   const [saving, setSaving] = useState(false);
+  const [credentials, setCredentials] = useState<CreatedCredentials | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -52,17 +61,19 @@ export default function BarbersPage() {
     const res = await fetch("/api/gstsantos/barbers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: form.name, email: form.email, isAdmin: form.isAdmin }),
+      body: JSON.stringify({ name: form.name, email: form.email, role: form.role, isBarber: true }),
     });
     setSaving(false);
 
     if (res.ok) {
+      const data = await res.json() as { name: string; email: string; tempPassword: string };
       setShowModal(false);
-      setForm({ name: "", email: "", isAdmin: false });
+      setForm({ name: "", email: "", role: "member" });
+      setCredentials({ name: data.name, email: data.email, tempPassword: data.tempPassword });
       await fetchAll();
     } else {
       const err = await res.json() as { error: string };
-      alert(err.error ?? "Erro ao criar barbeiro.");
+      alert(err.error === "email_already_exists" ? "Este e-mail já está cadastrado." : (err.error ?? "Erro ao criar barbeiro."));
     }
   }
 
@@ -81,22 +92,38 @@ export default function BarbersPage() {
     await fetchAll();
   }
 
-  async function toggleAdmin(b: Barber) {
+  async function toggleIsBarber(b: Barber) {
     await fetch(`/api/gstsantos/barbers/${b.memberId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isAdmin: !b.canCreateServices }),
+      body: JSON.stringify({ isBarber: !b.isBarber }),
     });
     await fetchAll();
   }
 
-  const canManage = me?.role === "owner" || me?.canCreateServices;
+  async function toggleRole(b: Barber) {
+    const newRole = b.role === "owner" ? "member" : "owner";
+    await fetch(`/api/gstsantos/barbers/${b.memberId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: newRole }),
+    });
+    await fetchAll();
+  }
+
+  function copyCredentials(creds: CreatedCredentials) {
+    void navigator.clipboard.writeText(`Email: ${creds.email}\nSenha: ${creds.tempPassword}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  const canManage = me?.role === "owner";
 
   return (
     <div style={{ padding: "24px 20px", maxWidth: 800, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F4EEDF", margin: 0 }}>
-          Barbeiros
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F4EEDF", margin: 0, flex: 1 }}>
+          Equipe
         </h1>
         {canManage && (
           <button onClick={() => setShowModal(true)} style={primaryBtn}>
@@ -117,14 +144,14 @@ export default function BarbersPage() {
             borderRadius: 12,
           }}
         >
-          Nenhum barbeiro cadastrado.
+          Nenhum membro cadastrado.
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {barbers.map((b) => {
-            const isOwner = b.role === "owner";
             const isMe = b.userId === me?.id;
-            const isAdminBarber = isOwner || b.canCreateServices;
+            const isOwnerBarber = b.role === "owner" && b.isBarber;
+            const isAdminOnly = b.role === "owner" && !b.isBarber;
 
             return (
               <div
@@ -159,57 +186,68 @@ export default function BarbersPage() {
                   {initials(b.name)}
                 </div>
 
-                {/* Info + badge */}
+                {/* Info + badges */}
                 <div style={{ flex: 1, minWidth: 120 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                     <p style={{ margin: 0, fontWeight: 600, color: "#F4EEDF", fontSize: 14 }}>
                       {b.name}
+                      {isMe && (
+                        <span style={{ marginLeft: 4, fontWeight: 400, color: "#8A847A", fontSize: 12 }}>
+                          (você)
+                        </span>
+                      )}
                     </p>
-                    {isOwner ? (
+                    {isAdminOnly && (
+                      <span style={badgeStyle("#A78BFA", "rgba(167,139,250,0.12)")}>Admin</span>
+                    )}
+                    {isOwnerBarber && (
                       <span style={badgeStyle("#C9A84C", "rgba(201,168,76,0.15)")}>Dono</span>
-                    ) : isAdminBarber ? (
-                      <span style={badgeStyle("#7CB9E8", "rgba(124,185,232,0.12)")}>Admin</span>
-                    ) : null}
+                    )}
+                    {b.role === "member" && (
+                      <span style={badgeStyle("#C8C2B4", "rgba(200,194,180,0.1)")}>Barbeiro</span>
+                    )}
+                    {b.isBarber && !b.hasWorkingHours && (
+                      <span
+                        title="Configure os horários em Minha Agenda para este barbeiro aparecer no booking"
+                        style={badgeStyle("#F59E0B", "rgba(245,158,11,0.1)")}
+                      >
+                        Sem horários
+                      </span>
+                    )}
                   </div>
                   <p style={{ margin: 0, fontSize: 12, color: "#8A847A" }}>{b.email}</p>
                 </div>
 
-                {/* "Barbeiro Admin" toggle — owner can toggle members only */}
-                {me?.role === "owner" && !isOwner && (
-                  <label
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      cursor: "pointer",
-                      fontSize: 12,
-                      color: "#C8C2B4",
-                    }}
-                  >
-                    <ToggleSwitch
-                      checked={b.canCreateServices}
-                      onChange={() => void toggleAdmin(b)}
-                    />
-                    Barbeiro Admin
-                  </label>
-                )}
+                {/* Controls — owner only, not on self */}
+                {me?.role === "owner" && !isMe && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    {/* Toggle role */}
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "#C8C2B4" }}>
+                      <ToggleSwitch checked={b.role === "owner"} onChange={() => void toggleRole(b)} />
+                      Acesso total
+                    </label>
 
-                {/* Delete — owner only, not on self or other owners */}
-                {me?.role === "owner" && !isOwner && !isMe && (
-                  <button
-                    onClick={() => void handleDelete(b.memberId)}
-                    style={{
-                      padding: "5px 12px",
-                      border: "1px solid #E5737344",
-                      borderRadius: 999,
-                      background: "#E5737311",
-                      color: "#E57373",
-                      fontSize: 12,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Remover
-                  </button>
+                    {/* Toggle isBarber */}
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "#C8C2B4" }}>
+                      <ToggleSwitch checked={b.isBarber} onChange={() => void toggleIsBarber(b)} />
+                      É barbeiro
+                    </label>
+
+                    <button
+                      onClick={() => void handleDelete(b.memberId)}
+                      style={{
+                        padding: "5px 12px",
+                        border: "1px solid #E5737344",
+                        borderRadius: 999,
+                        background: "#E5737311",
+                        color: "#E57373",
+                        fontSize: 12,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Remover
+                    </button>
+                  </div>
                 )}
               </div>
             );
@@ -247,7 +285,7 @@ export default function BarbersPage() {
               Adicionar barbeiro
             </h2>
             <p style={{ margin: "0 0 20px", color: "#8A847A", fontSize: 13 }}>
-              Um link de acesso será enviado por e-mail.
+              As credenciais serão exibidas após a criação.
             </p>
 
             <Field label="Nome">
@@ -271,16 +309,16 @@ export default function BarbersPage() {
             <Field label="Perfil">
               <div style={{ display: "flex", gap: 8 }}>
                 <ProfileOption
-                  selected={!form.isAdmin}
-                  onClick={() => setForm((f) => ({ ...f, isAdmin: false }))}
+                  selected={form.role === "member"}
+                  onClick={() => setForm((f) => ({ ...f, role: "member" }))}
                   title="Barbeiro"
                   description="Acessa apenas a própria agenda"
                 />
                 <ProfileOption
-                  selected={form.isAdmin}
-                  onClick={() => setForm((f) => ({ ...f, isAdmin: true }))}
-                  title="Barbeiro Admin"
-                  description="Gerencia serviços e barbeiros"
+                  selected={form.role === "owner"}
+                  onClick={() => setForm((f) => ({ ...f, role: "owner" }))}
+                  title="Barbeiro Dono"
+                  description="Acesso total ao sistema"
                 />
               </div>
             </Field>
@@ -292,9 +330,97 @@ export default function BarbersPage() {
               <button
                 onClick={() => void handleCreate()}
                 disabled={saving || !form.name || !form.email}
-                style={{ ...primaryBtn, flex: 1, marginLeft: 0 }}
+                style={{ ...primaryBtn, flex: 1, marginLeft: 0, opacity: saving || !form.name || !form.email ? 0.5 : 1 }}
               >
                 {saving ? "Criando..." : "Criar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Credentials modal */}
+      {credentials && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.75)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+            zIndex: 100,
+          }}
+        >
+          <div
+            style={{
+              background: "#131211",
+              border: "1px solid #2A2620",
+              borderRadius: 16,
+              padding: 28,
+              width: "100%",
+              maxWidth: 400,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: "50%",
+                  background: "rgba(74,222,128,0.15)",
+                  display: "grid",
+                  placeItems: "center",
+                  fontSize: 18,
+                }}
+              >
+                ✓
+              </div>
+              <div>
+                <p style={{ margin: 0, fontWeight: 700, color: "#F4EEDF", fontSize: 16 }}>
+                  Barbeiro criado!
+                </p>
+                <p style={{ margin: 0, color: "#8A847A", fontSize: 12 }}>
+                  Compartilhe as credenciais com {credentials.name}
+                </p>
+              </div>
+            </div>
+
+            <div
+              style={{
+                background: "#0B0B0B",
+                border: "1px solid #2A2620",
+                borderRadius: 10,
+                padding: "14px 16px",
+                marginBottom: 16,
+                fontFamily: "monospace",
+              }}
+            >
+              <p style={{ margin: "0 0 6px", fontSize: 12, color: "#8A847A" }}>E-mail</p>
+              <p style={{ margin: "0 0 14px", fontSize: 14, color: "#F4EEDF" }}>{credentials.email}</p>
+              <p style={{ margin: "0 0 6px", fontSize: 12, color: "#8A847A" }}>Senha temporária</p>
+              <p style={{ margin: 0, fontSize: 14, color: "#C9A84C", wordBreak: "break-all" }}>
+                {credentials.tempPassword}
+              </p>
+            </div>
+
+            <p style={{ margin: "0 0 20px", fontSize: 12, color: "#8A847A" }}>
+              O barbeiro deve acessar o sistema com estas credenciais e alterar a senha. Um e-mail de redefinição também foi enviado (se configurado).
+            </p>
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => copyCredentials(credentials)}
+                style={{ ...ghostBtn, flex: 1 }}
+              >
+                {copied ? "Copiado!" : "Copiar credenciais"}
+              </button>
+              <button
+                onClick={() => setCredentials(null)}
+                style={{ ...primaryBtn, flex: 1, marginLeft: 0 }}
+              >
+                Fechar
               </button>
             </div>
           </div>

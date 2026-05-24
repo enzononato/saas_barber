@@ -25,7 +25,7 @@ export default async function GstLayout({ children }: { children: React.ReactNod
         fontFamily: "Inter, sans-serif",
       }}
     >
-      <SidebarNav role={ctx.role} canManageBarbers={ctx.role === "owner" || ctx.canCreateServices} />
+      <SidebarNav role={ctx.role} canManageBarbers={ctx.role === "owner"} isBarber={ctx.isBarber} />
       <main
         style={{
           flex: 1,

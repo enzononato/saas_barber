@@ -192,6 +192,7 @@ export async function sendText(
   instanceName: string,
   number: string,
   text: string,
+  delay?: number,
 ): Promise<boolean> {
   if (!isConfigured()) {
     console.log("[evolution] sendText skipped: not configured");
@@ -203,7 +204,7 @@ export async function sendText(
       {
         method: "POST",
         headers: headers(),
-        body: JSON.stringify({ number, text }),
+        body: JSON.stringify({ number, text, ...(delay ? { delay } : {}) }),
       },
     );
     if (!res.ok) {

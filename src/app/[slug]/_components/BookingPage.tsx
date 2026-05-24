@@ -11,6 +11,7 @@ interface BookingPageProps {
   orgName: string;
   initialServices: Service[];
   initialMembers: Member[];
+  teamMembers: Member[];
 }
 
 const fmtPrice = (price: string) =>
@@ -407,6 +408,7 @@ export function BookingPage({
   orgName: _orgName,
   initialServices,
   initialMembers,
+  teamMembers,
 }: BookingPageProps) {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [presetService, setPresetService] = useState<Service | null>(null);
@@ -432,11 +434,11 @@ export function BookingPage({
       <Hero
         onBook={() => openWizard()}
         serviceCount={initialServices.length}
-        barberCount={initialMembers.filter((m) => m.id !== "any").length}
+        barberCount={teamMembers.length}
       />
       <Gallery />
       <Services services={initialServices} onBook={(s) => openWizard(s)} />
-      <Team members={initialMembers} />
+      <Team members={teamMembers} />
       <Location />
       <Footer />
 

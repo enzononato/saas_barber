@@ -17,25 +17,27 @@ export async function PATCH(
   if (!canManageBarbers) return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
   const { memberId } = await params;
-  const body = await req.json();
-  // Accept both `isAdmin` (new) and `canCreateServices` (legacy) as the same flag
-  const { isAdmin, canCreateServices } = body as { isAdmin?: boolean; canCreateServices?: boolean };
-  const newValue = isAdmin ?? canCreateServices;
-
-  if (typeof newValue !== "boolean") {
-    return NextResponse.json({ error: "isAdmin must be a boolean" }, { status: 400 });
-  }
-
   // Only owner can promote/demote barbers
   if (ctx.role !== "owner") {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
+  const body = await req.json();
+  const { isBarber, role } = body as { isBarber?: boolean; role?: "owner" | "member" };
+
+  if (isBarber === undefined && role === undefined) {
+    return NextResponse.json({ error: "isBarber or role required" }, { status: 400 });
+  }
+
+  const patch: Record<string, unknown> = {};
+  if (typeof isBarber === "boolean") patch.isBarber = isBarber;
+  if (role === "owner" || role === "member") patch.role = role;
+
   const [updated] = await db
     .update(member)
-    .set({ canCreateServices: newValue })
+    .set(patch)
     .where(and(eq(member.id, memberId), eq(member.organizationId, ctx.orgId)))
-    .returning({ id: member.id });
+    .returning({ id: member.id, role: member.role });
 
   if (!updated) return NextResponse.json({ error: "not_found" }, { status: 404 });
 

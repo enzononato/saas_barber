@@ -17,8 +17,6 @@ export async function GET(
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
-  // Qualquer membro da org com working_hours cadastrado é "barbeiro" para fins de agendamento
-  // (inclui owner se ele também atende como barbeiro)
   const professionals = await db
     .select({ id: user.id, name: user.name })
     .from(member)
@@ -26,6 +24,7 @@ export async function GET(
     .where(
       and(
         eq(member.organizationId, org.id),
+        eq(member.isBarber, true),
         exists(
           db
             .select({ id: workingHours.id })

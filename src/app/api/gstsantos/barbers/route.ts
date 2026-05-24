@@ -1,10 +1,11 @@
-import { eq } from "drizzle-orm";
+import { and, eq, exists } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { db } from "@/server/db";
 import { member, user } from "@/server/db/schema/auth";
+import { workingHours } from "@/server/db/schema/availability";
 import { requireAuth } from "@/server/middleware/requireAuth";
 import { getOrgBySlug } from "@/server/services/tenant";
 
@@ -12,7 +13,6 @@ export async function GET() {
   const ctx = await requireAuth();
   if (!ctx) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  // Return ALL members (owners + regular) so both profile types show in the barbers list
   const rows = await db
     .select({
       memberId: member.id,
@@ -20,14 +20,31 @@ export async function GET() {
       name: user.name,
       email: user.email,
       role: member.role,
-      canCreateServices: member.canCreateServices,
+      isBarber: member.isBarber,
       createdAt: member.createdAt,
     })
     .from(member)
     .innerJoin(user, eq(member.userId, user.id))
     .where(eq(member.organizationId, ctx.orgId));
 
-  return NextResponse.json(rows);
+  // Enrich with hasWorkingHours flag
+  const enriched = await Promise.all(
+    rows.map(async (row) => {
+      const [wh] = await db
+        .select({ id: workingHours.id })
+        .from(workingHours)
+        .where(
+          and(
+            eq(workingHours.organizationId, ctx.orgId),
+            eq(workingHours.professionalId, row.userId),
+          ),
+        )
+        .limit(1);
+      return { ...row, hasWorkingHours: Boolean(wh) };
+    }),
+  );
+
+  return NextResponse.json(enriched);
 }
 
 export async function POST(req: Request) {
@@ -38,10 +55,20 @@ export async function POST(req: Request) {
   if (!canManageBarbers) return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
   const body = await req.json();
-  const { name, email, isAdmin } = body as { name?: string; email?: string; isAdmin?: boolean };
+  const {
+    name,
+    email,
+    role = "member",
+    isBarber = true,
+  } = body as { name?: string; email?: string; role?: "owner" | "member"; isBarber?: boolean };
 
   if (!name || !email) {
     return NextResponse.json({ error: "name and email are required" }, { status: 400 });
+  }
+
+  // Only owner can create another owner
+  if (role === "owner" && ctx.role !== "owner") {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
   const tempPassword = crypto.randomUUID();
@@ -62,8 +89,9 @@ export async function POST(req: Request) {
     id: memberId,
     organizationId: org.id,
     userId: newUserId,
-    role: "member",
-    canCreateServices: isAdmin ?? false,
+    role,
+    isBarber,
+    canCreateServices: false,
     createdAt: new Date(),
   });
 
@@ -77,5 +105,8 @@ export async function POST(req: Request) {
     console.error("[INVITE] requestPasswordReset failed:", err);
   }
 
-  return NextResponse.json({ memberId, userId: newUserId, name, email }, { status: 201 });
+  return NextResponse.json(
+    { memberId, userId: newUserId, name, email, role, isBarber, tempPassword },
+    { status: 201 },
+  );
 }

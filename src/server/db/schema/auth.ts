@@ -72,6 +72,7 @@ export const member = pgTable("member", {
     .references(() => user.id, { onDelete: "cascade" }),
   role: text("role").notNull(),
   canCreateServices: boolean("canCreateServices").notNull().default(false),
+  isBarber: boolean("is_barber").notNull().default(true),
   createdAt: timestamp("createdAt", { withTimezone: true }).notNull(),
 });
 

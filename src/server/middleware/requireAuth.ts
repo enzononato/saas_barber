@@ -13,6 +13,7 @@ export interface AuthContext {
   memberId: string;
   role: "owner" | "member";
   canCreateServices: boolean;
+  isBarber: boolean;
   orgId: string;
 }
 
@@ -28,6 +29,7 @@ export async function requireAuth(): Promise<AuthContext | null> {
       id: member.id,
       role: member.role,
       canCreateServices: member.canCreateServices,
+      isBarber: member.isBarber,
     })
     .from(member)
     .where(and(eq(member.organizationId, org.id), eq(member.userId, session.user.id)))
@@ -43,6 +45,7 @@ export async function requireAuth(): Promise<AuthContext | null> {
     memberId: m.id,
     role: m.role as "owner" | "member",
     canCreateServices: m.canCreateServices,
+    isBarber: m.isBarber,
     orgId: org.id,
   };
 }

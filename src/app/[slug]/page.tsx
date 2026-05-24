@@ -31,7 +31,7 @@ export default async function Page({
   const org = await getOrgBySlug(slug);
   if (!org) notFound();
 
-  const [servicesRows, membersRows] = await Promise.all([
+  const [servicesRows, teamRows, bookingMembersRows] = await Promise.all([
     db
       .select({
         id: services.id,
@@ -43,6 +43,14 @@ export default async function Page({
       .from(services)
       .where(and(eq(services.organizationId, org.id), eq(services.isActive, true)))
       .orderBy(services.name),
+    // Seção de equipe: todos os barbeiros, independente de ter horário
+    db
+      .select({ id: user.id, name: user.name })
+      .from(member)
+      .innerJoin(user, eq(member.userId, user.id))
+      .where(and(eq(member.organizationId, org.id), eq(member.isBarber, true)))
+      .orderBy(user.name),
+    // Wizard de booking: apenas barbeiros com horários cadastrados
     db
       .select({ id: user.id, name: user.name })
       .from(member)
@@ -50,6 +58,7 @@ export default async function Page({
       .where(
         and(
           eq(member.organizationId, org.id),
+          eq(member.isBarber, true),
           exists(
             db
               .select({ id: workingHours.id })
@@ -67,14 +76,15 @@ export default async function Page({
       .orderBy(user.name),
   ]);
 
-  const allMembers = [{ id: "any", name: "Sem preferência" }, ...membersRows];
+  const bookingMembers = [{ id: "any", name: "Sem preferência" }, ...bookingMembersRows];
 
   return (
     <BookingPage
       slug={slug}
       orgName={org.name}
       initialServices={servicesRows}
-      initialMembers={allMembers}
+      initialMembers={bookingMembers}
+      teamMembers={teamRows}
     />
   );
 }
