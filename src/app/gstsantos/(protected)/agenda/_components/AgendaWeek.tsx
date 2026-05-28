@@ -140,6 +140,7 @@ export function AgendaWeek({ appointments, date, onDateChange }: Props) {
                   dayApts.map((apt) => (
                     <div
                       key={apt.id}
+                      title={apt.notes ?? undefined}
                       style={{
                         background: "#0B0B0B",
                         border: "1px solid #2A2620",
@@ -159,6 +160,21 @@ export function AgendaWeek({ appointments, date, onDateChange }: Props) {
                       <p style={{ margin: 0, fontSize: 10, color: "#8A847A" }}>
                         {apt.customerName}
                       </p>
+                      {apt.notes && (
+                        <p
+                          style={{
+                            margin: "2px 0 0",
+                            fontSize: 9,
+                            color: "#8A847A",
+                            fontStyle: "italic",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          📝 {apt.notes}
+                        </p>
+                      )}
                     </div>
                   ))
                 )}

@@ -62,7 +62,12 @@ export async function getSlotsForProfessional(
   const { start: dayStart, end: dayEnd } = dayBoundariesUtc(date, timezone);
 
   const hours = await db
-    .select({ startTime: workingHours.startTime, endTime: workingHours.endTime })
+    .select({
+      startTime: workingHours.startTime,
+      endTime: workingHours.endTime,
+      breakStartTime: workingHours.breakStartTime,
+      breakEndTime: workingHours.breakEndTime,
+    })
     .from(workingHours)
     .where(
       and(
@@ -77,6 +82,12 @@ export async function getSlotsForProfessional(
 
   const workStart = parseTimeOnDate(hours[0].startTime, date, timezone);
   const workEnd = parseTimeOnDate(hours[0].endTime, date, timezone);
+  const breakStart = hours[0].breakStartTime
+    ? parseTimeOnDate(hours[0].breakStartTime, date, timezone)
+    : null;
+  const breakEnd = hours[0].breakEndTime
+    ? parseTimeOnDate(hours[0].breakEndTime, date, timezone)
+    : null;
 
   const candidates: Slot[] = [];
   let cursor = workStart;
@@ -118,6 +129,10 @@ export async function getSlotsForProfessional(
     end: new Date(b.endsAt),
   }));
 
+  if (breakStart && breakEnd) {
+    blocked.push({ start: breakStart, end: breakEnd });
+  }
+
   return candidates.filter(
     (slot) => !blocked.some((b) => overlaps(slot.startsAt, slot.endsAt, b.start, b.end)),
   );
@@ -136,7 +151,12 @@ export async function isProfessionalAvailableAt(
   const dayOfWeek = new Date(`${date}T12:00:00${offset}`).getUTCDay();
 
   const hours = await db
-    .select({ startTime: workingHours.startTime, endTime: workingHours.endTime })
+    .select({
+      startTime: workingHours.startTime,
+      endTime: workingHours.endTime,
+      breakStartTime: workingHours.breakStartTime,
+      breakEndTime: workingHours.breakEndTime,
+    })
     .from(workingHours)
     .where(
       and(
@@ -152,6 +172,12 @@ export async function isProfessionalAvailableAt(
   const workStart = parseTimeOnDate(hours[0].startTime, date, timezone);
   const workEnd = parseTimeOnDate(hours[0].endTime, date, timezone);
   if (startsAt < workStart || endsAt > workEnd) return false;
+
+  if (hours[0].breakStartTime && hours[0].breakEndTime) {
+    const breakStart = parseTimeOnDate(hours[0].breakStartTime, date, timezone);
+    const breakEnd = parseTimeOnDate(hours[0].breakEndTime, date, timezone);
+    if (overlaps(startsAt, endsAt, breakStart, breakEnd)) return false;
+  }
 
   const blockedByException = await db
     .select({ id: timeExceptions.id })

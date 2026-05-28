@@ -45,6 +45,8 @@ export async function POST(req: Request) {
     dayOfWeek: number;
     startTime: string;
     endTime: string;
+    breakStartTime?: string | null;
+    breakEndTime?: string | null;
   }>;
 
   if (!Array.isArray(hours)) {
@@ -63,13 +65,18 @@ export async function POST(req: Request) {
 
   if (hours.length > 0) {
     await db.insert(workingHours).values(
-      hours.map((h) => ({
-        organizationId: ctx.orgId,
-        professionalId: targetUserId,
-        dayOfWeek: h.dayOfWeek,
-        startTime: h.startTime,
-        endTime: h.endTime,
-      })),
+      hours.map((h) => {
+        const hasBreak = Boolean(h.breakStartTime && h.breakEndTime);
+        return {
+          organizationId: ctx.orgId,
+          professionalId: targetUserId,
+          dayOfWeek: h.dayOfWeek,
+          startTime: h.startTime,
+          endTime: h.endTime,
+          breakStartTime: hasBreak ? h.breakStartTime! : null,
+          breakEndTime: hasBreak ? h.breakEndTime! : null,
+        };
+      }),
     );
   }
 

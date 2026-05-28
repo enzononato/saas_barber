@@ -57,6 +57,20 @@
       "when": 1748044800000,
       "tag": "0007_member_is_barber",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1779883200000,
+      "tag": "0008_lunch_break_and_expenses",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1779969600000,
+      "tag": "0009_commissions_and_recurring_expenses",
+      "breakpoints": true
     }
   ]
 }

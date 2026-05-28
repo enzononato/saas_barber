@@ -25,6 +25,14 @@ interface CreatedCredentials {
   tempPassword: string;
 }
 
+interface CommissionRow {
+  serviceId: string;
+  serviceName: string;
+  servicePrice: string;
+  attached: boolean;
+  commissionPct: string;
+}
+
 function initials(name: string) {
   return name
     .split(" ")
@@ -42,6 +50,10 @@ export default function BarbersPage() {
   const [saving, setSaving] = useState(false);
   const [credentials, setCredentials] = useState<CreatedCredentials | null>(null);
   const [copied, setCopied] = useState(false);
+  const [commissionsBarber, setCommissionsBarber] = useState<Barber | null>(null);
+  const [commissionRows, setCommissionRows] = useState<CommissionRow[]>([]);
+  const [commissionsLoading, setCommissionsLoading] = useState(false);
+  const [commissionsSaving, setCommissionsSaving] = useState(false);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -115,6 +127,47 @@ export default function BarbersPage() {
     void navigator.clipboard.writeText(`Email: ${creds.email}\nSenha: ${creds.tempPassword}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function openCommissions(b: Barber) {
+    setCommissionsBarber(b);
+    setCommissionsLoading(true);
+    setCommissionRows([]);
+    const res = await fetch(`/api/gstsantos/barbers/${b.memberId}/commissions`);
+    if (res.ok) setCommissionRows(await res.json());
+    setCommissionsLoading(false);
+  }
+
+  async function saveCommissions() {
+    if (!commissionsBarber) return;
+    setCommissionsSaving(true);
+    const payload = {
+      commissions: commissionRows.map((r) => ({
+        serviceId: r.serviceId,
+        commissionPct: parseFloat(r.commissionPct) || 0,
+      })),
+    };
+    const res = await fetch(
+      `/api/gstsantos/barbers/${commissionsBarber.memberId}/commissions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
+    setCommissionsSaving(false);
+    if (res.ok) {
+      setCommissionsBarber(null);
+      setCommissionRows([]);
+    } else {
+      alert("Erro ao salvar comissões.");
+    }
+  }
+
+  function updateCommissionRow(serviceId: string, pct: string) {
+    setCommissionRows((rows) =>
+      rows.map((r) => (r.serviceId === serviceId ? { ...r, commissionPct: pct } : r)),
+    );
   }
 
   const canManage = me?.role === "owner";
@@ -233,6 +286,23 @@ export default function BarbersPage() {
                       É barbeiro
                     </label>
 
+                    {b.isBarber && (
+                      <button
+                        onClick={() => void openCommissions(b)}
+                        style={{
+                          padding: "5px 12px",
+                          border: "1px solid #C9A84C44",
+                          borderRadius: 999,
+                          background: "rgba(201,168,76,0.08)",
+                          color: "#C9A84C",
+                          fontSize: 12,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Comissões
+                      </button>
+                    )}
+
                     <button
                       onClick={() => void handleDelete(b.memberId)}
                       style={{
@@ -333,6 +403,122 @@ export default function BarbersPage() {
                 style={{ ...primaryBtn, flex: 1, marginLeft: 0, opacity: saving || !form.name || !form.email ? 0.5 : 1 }}
               >
                 {saving ? "Criando..." : "Criar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Commissions modal */}
+      {commissionsBarber && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+            zIndex: 100,
+          }}
+          onClick={() => setCommissionsBarber(null)}
+        >
+          <div
+            style={{
+              background: "#131211",
+              border: "1px solid #2A2620",
+              borderRadius: 16,
+              padding: 24,
+              width: "100%",
+              maxWidth: 520,
+              maxHeight: "85vh",
+              overflowY: "auto",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ margin: "0 0 4px", color: "#F4EEDF", fontSize: 18 }}>
+              Comissões de {commissionsBarber.name}
+            </h2>
+            <p style={{ margin: "0 0 18px", color: "#8A847A", fontSize: 12 }}>
+              Defina a comissão (% sobre o preço) para cada serviço. O barbeiro fica atrelado
+              automaticamente aos serviços com comissão configurada.
+            </p>
+
+            {commissionsLoading ? (
+              <p style={{ color: "#8A847A" }}>Carregando...</p>
+            ) : commissionRows.length === 0 ? (
+              <p style={{ color: "#8A847A", textAlign: "center", padding: "20px 0" }}>
+                Nenhum serviço cadastrado.
+              </p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {commissionRows.map((r) => (
+                  <div
+                    key={r.serviceId}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "10px 12px",
+                      background: "#0B0B0B",
+                      border: "1px solid #2A2620",
+                      borderRadius: 8,
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: 0, color: "#F4EEDF", fontSize: 13, fontWeight: 600 }}>
+                        {r.serviceName}
+                      </p>
+                      <p style={{ margin: 0, color: "#8A847A", fontSize: 11 }}>
+                        R$ {parseFloat(r.servicePrice).toFixed(2).replace(".", ",")}
+                      </p>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={1}
+                        value={r.commissionPct}
+                        onChange={(e) => updateCommissionRow(r.serviceId, e.target.value)}
+                        style={{
+                          width: 70,
+                          padding: "6px 10px",
+                          background: "#131211",
+                          border: "1px solid #2A2620",
+                          borderRadius: 6,
+                          color: "#F4EEDF",
+                          fontSize: 13,
+                          textAlign: "right",
+                          outline: "none",
+                        }}
+                      />
+                      <span style={{ color: "#8A847A", fontSize: 13 }}>%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button
+                onClick={() => setCommissionsBarber(null)}
+                style={{ ...ghostBtn, flex: 1 }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => void saveCommissions()}
+                disabled={commissionsSaving || commissionsLoading}
+                style={{
+                  ...primaryBtn,
+                  flex: 1,
+                  marginLeft: 0,
+                  opacity: commissionsSaving || commissionsLoading ? 0.5 : 1,
+                }}
+              >
+                {commissionsSaving ? "Salvando..." : "Salvar"}
               </button>
             </div>
           </div>

@@ -25,6 +25,8 @@ export const workingHours = pgTable(
     dayOfWeek: smallint("day_of_week").notNull(),
     startTime: time("start_time").notNull(),
     endTime: time("end_time").notNull(),
+    breakStartTime: time("break_start_time"),
+    breakEndTime: time("break_end_time"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()

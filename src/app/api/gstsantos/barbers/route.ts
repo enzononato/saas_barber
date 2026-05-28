@@ -95,7 +95,7 @@ export async function POST(req: Request) {
     createdAt: new Date(),
   });
 
-  const setupPage = `${env.BETTER_AUTH_URL}/gstsantos/reset-password`;
+  const setupPage = `${(env.BETTER_AUTH_URL ?? "").replace(/\/$/, "")}/gstsantos/reset-password`;
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (auth.api as any).requestPasswordReset({

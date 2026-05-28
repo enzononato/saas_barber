@@ -58,6 +58,24 @@ function KanbanCard({ apt, isDragging }: { apt: Appointment; isDragging?: boolea
       <p style={{ margin: 0, color: "#8A847A", fontSize: 11 }}>
         {fmtTime(apt.startsAt)} · {apt.professionalName}
       </p>
+      {apt.notes && (
+        <p
+          title={apt.notes}
+          style={{
+            margin: "6px 0 0",
+            color: "#8A847A",
+            fontSize: 10,
+            fontStyle: "italic",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical" as const,
+          }}
+        >
+          📝 {apt.notes}
+        </p>
+      )}
     </div>
   );
 }

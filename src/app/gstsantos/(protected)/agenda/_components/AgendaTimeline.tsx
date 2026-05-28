@@ -141,6 +141,7 @@ export function AgendaTimeline({ appointments, date }: Props) {
                 return (
                   <div
                     key={apt.id}
+                    title={apt.notes ? `${apt.customerName} — ${apt.notes}` : apt.customerName}
                     style={{
                       position: "absolute",
                       top: Math.max(0, top),
@@ -161,6 +162,21 @@ export function AgendaTimeline({ appointments, date }: Props) {
                     <p style={{ margin: 0, fontSize: 10, color: "#8A847A" }}>
                       {apt.serviceNameAtBooking}
                     </p>
+                    {apt.notes && (
+                      <p
+                        style={{
+                          margin: "2px 0 0",
+                          fontSize: 9,
+                          color: "#8A847A",
+                          fontStyle: "italic",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        📝 {apt.notes}
+                      </p>
+                    )}
                   </div>
                 );
               })}

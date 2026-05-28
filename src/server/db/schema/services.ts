@@ -49,11 +49,16 @@ export const barberServices = pgTable(
     serviceId: uuid("service_id")
       .notNull()
       .references(() => services.id, { onDelete: "cascade" }),
+    commissionPct: numeric("commission_pct", { precision: 5, scale: 2 }).notNull().default("0"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     unique("barber_services_member_service_uniq").on(table.memberId, table.serviceId),
     index("barber_services_member_idx").on(table.memberId),
     index("barber_services_service_idx").on(table.serviceId),
+    check(
+      "barber_services_commission_range_check",
+      sql`${table.commissionPct} >= 0 AND ${table.commissionPct} <= 100`,
+    ),
   ],
 );

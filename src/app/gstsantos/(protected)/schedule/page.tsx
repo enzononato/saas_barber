@@ -10,6 +10,8 @@ interface WorkingHour {
   dayOfWeek: number;
   startTime: string;
   endTime: string;
+  breakStartTime: string | null;
+  breakEndTime: string | null;
 }
 
 interface TimeException {
@@ -34,15 +36,37 @@ interface Me {
 
 const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0]; // Mon first
 
-type DayState = { enabled: boolean; startTime: string; endTime: string };
+type DayState = {
+  enabled: boolean;
+  startTime: string;
+  endTime: string;
+  hasBreak: boolean;
+  breakStartTime: string;
+  breakEndTime: string;
+};
 
 function buildDayMap(rows: WorkingHour[]): Record<number, DayState> {
   const map: Record<number, DayState> = {};
   for (let i = 0; i <= 6; i++) {
-    map[i] = { enabled: false, startTime: "09:00", endTime: "18:00" };
+    map[i] = {
+      enabled: false,
+      startTime: "09:00",
+      endTime: "18:00",
+      hasBreak: false,
+      breakStartTime: "12:00",
+      breakEndTime: "13:00",
+    };
   }
   for (const r of rows) {
-    map[r.dayOfWeek] = { enabled: true, startTime: r.startTime, endTime: r.endTime };
+    const hasBreak = Boolean(r.breakStartTime && r.breakEndTime);
+    map[r.dayOfWeek] = {
+      enabled: true,
+      startTime: r.startTime.slice(0, 5),
+      endTime: r.endTime.slice(0, 5),
+      hasBreak,
+      breakStartTime: hasBreak ? r.breakStartTime!.slice(0, 5) : "12:00",
+      breakEndTime: hasBreak ? r.breakEndTime!.slice(0, 5) : "13:00",
+    };
   }
   return map;
 }
@@ -103,12 +127,32 @@ export default function SchedulePage() {
 
   async function saveHours() {
     if (!selectedProfId || !me) return;
+
+    // Client-side validation: break must be within work hours
+    for (const d of WEEK_DAYS) {
+      const ds = hours[d];
+      if (!ds?.enabled || !ds.hasBreak) continue;
+      if (ds.breakStartTime >= ds.breakEndTime) {
+        alert(`${DAY_NAMES[d]}: o início do intervalo deve ser antes do fim.`);
+        return;
+      }
+      if (ds.breakStartTime < ds.startTime || ds.breakEndTime > ds.endTime) {
+        alert(`${DAY_NAMES[d]}: o intervalo deve estar dentro do horário de trabalho.`);
+        return;
+      }
+    }
+
     setSaving(true);
-    const hoursArr = WEEK_DAYS.filter((d) => hours[d]?.enabled).map((d) => ({
-      dayOfWeek: d,
-      startTime: hours[d].startTime,
-      endTime: hours[d].endTime,
-    }));
+    const hoursArr = WEEK_DAYS.filter((d) => hours[d]?.enabled).map((d) => {
+      const ds = hours[d];
+      return {
+        dayOfWeek: d,
+        startTime: ds.startTime,
+        endTime: ds.endTime,
+        breakStartTime: ds.hasBreak ? ds.breakStartTime : null,
+        breakEndTime: ds.hasBreak ? ds.breakEndTime : null,
+      };
+    });
 
     await fetch("/api/gstsantos/working-hours", {
       method: "POST",
@@ -214,47 +258,111 @@ export default function SchedulePage() {
               Horários de trabalho
             </h2>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               {WEEK_DAYS.map((day) => {
-                const ds = hours[day] ?? { enabled: false, startTime: "09:00", endTime: "18:00" };
+                const ds =
+                  hours[day] ?? {
+                    enabled: false,
+                    startTime: "09:00",
+                    endTime: "18:00",
+                    hasBreak: false,
+                    breakStartTime: "12:00",
+                    breakEndTime: "13:00",
+                  };
                 return (
                   <div
                     key={day}
-                    style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}
+                    style={{ display: "flex", flexDirection: "column", gap: 6 }}
                   >
-                    <ToggleSwitch
-                      checked={ds.enabled}
-                      onChange={() => updateDay(day, { enabled: !ds.enabled })}
-                    />
-                    <span
-                      style={{
-                        width: 32,
-                        fontSize: 13,
-                        color: ds.enabled ? "#F4EEDF" : "#8A847A",
-                        fontWeight: ds.enabled ? 600 : 400,
-                      }}
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}
                     >
-                      {DAY_NAMES[day]}
-                    </span>
+                      <ToggleSwitch
+                        checked={ds.enabled}
+                        onChange={() => updateDay(day, { enabled: !ds.enabled })}
+                      />
+                      <span
+                        style={{
+                          width: 32,
+                          fontSize: 13,
+                          color: ds.enabled ? "#F4EEDF" : "#8A847A",
+                          fontWeight: ds.enabled ? 600 : 400,
+                        }}
+                      >
+                        {DAY_NAMES[day]}
+                      </span>
 
-                    {ds.enabled ? (
-                      <>
-                        <input
-                          type="time"
-                          value={ds.startTime}
-                          onChange={(e) => updateDay(day, { startTime: e.target.value })}
-                          style={timeInput}
-                        />
-                        <span style={{ color: "#8A847A", fontSize: 12 }}>até</span>
-                        <input
-                          type="time"
-                          value={ds.endTime}
-                          onChange={(e) => updateDay(day, { endTime: e.target.value })}
-                          style={timeInput}
-                        />
-                      </>
-                    ) : (
-                      <span style={{ color: "#3A3630", fontSize: 12 }}>Folga</span>
+                      {ds.enabled ? (
+                        <>
+                          <input
+                            type="time"
+                            value={ds.startTime}
+                            onChange={(e) => updateDay(day, { startTime: e.target.value })}
+                            style={timeInput}
+                          />
+                          <span style={{ color: "#8A847A", fontSize: 12 }}>até</span>
+                          <input
+                            type="time"
+                            value={ds.endTime}
+                            onChange={(e) => updateDay(day, { endTime: e.target.value })}
+                            style={timeInput}
+                          />
+                        </>
+                      ) : (
+                        <span style={{ color: "#3A3630", fontSize: 12 }}>Folga</span>
+                      )}
+                    </div>
+
+                    {ds.enabled && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          flexWrap: "wrap",
+                          paddingLeft: 48,
+                        }}
+                      >
+                        <label
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            fontSize: 12,
+                            color: "#8A847A",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={ds.hasBreak}
+                            onChange={() => updateDay(day, { hasBreak: !ds.hasBreak })}
+                            style={{ accentColor: "#C9A84C" }}
+                          />
+                          Intervalo
+                        </label>
+                        {ds.hasBreak && (
+                          <>
+                            <input
+                              type="time"
+                              value={ds.breakStartTime}
+                              onChange={(e) =>
+                                updateDay(day, { breakStartTime: e.target.value })
+                              }
+                              style={timeInput}
+                            />
+                            <span style={{ color: "#8A847A", fontSize: 12 }}>até</span>
+                            <input
+                              type="time"
+                              value={ds.breakEndTime}
+                              onChange={(e) =>
+                                updateDay(day, { breakEndTime: e.target.value })
+                              }
+                              style={timeInput}
+                            />
+                          </>
+                        )}
+                      </div>
                     )}
                   </div>
                 );

@@ -2,7 +2,7 @@
 > **Leia este arquivo antes de qualquer ação.** Ele é a fonte da verdade sobre o estado atual do projeto.
 > Para requisitos completos de produto e schema, leia `CONTEXT.md`.
 
-**Última atualização:** 2026-05-23 — Provisionamento 1-click WhatsApp (QR code) + Página de Clientes (CRM)
+**Última atualização:** 2026-05-27 — Módulo BI completo (3 fases): Insights/Carteira + Lucratividade/Comissões + Simulação/Alertas/CSV
 **Atualize este arquivo ao concluir cada fase.**
 
 ---
@@ -270,6 +270,111 @@ src/
 - **Env vars novas:** `EVOLUTION_API_URL` (sua Evolution na VPS) + `EVOLUTION_API_KEY` (master key)
 - **Migration 0006:** roda automaticamente no `npm run db:migrate`
 - **Backfill one-time:** rodar `npm run db:backfill-customers` em produção uma única vez para popular clientes a partir do histórico existente
+
+### FASE 8 — Refinamentos UX (intervalo de almoço, despesas, notas, busca, env fix) · `✅ CONCLUÍDA`
+**Responsável:** Claude Opus
+
+**Migration `0008_lunch_break_and_expenses.sql`:**
+- [x] `working_hours` ganha `break_start_time` e `break_end_time` (opcionais) + constraint que mantém o intervalo dentro do horário de trabalho
+- [x] Nova tabela `expenses` (id, org, description, category, amount, date, created_by_user_id) — controle de despesas no financeiro
+
+**Fix `src/lib/env.ts`:**
+- [x] `z.preprocess` em todas as env vars opcionais para tratar `""` como `undefined` — resolvia erro `Invalid url` quando o EasyPanel definia a var com valor vazio
+
+**APIs novas/estendidas:**
+- [x] `GET/POST /api/gstsantos/expenses` + `DELETE /[id]` (owner only)
+- [x] `working-hours` POST aceita `breakStartTime` + `breakEndTime`
+- [x] `financial` GET retorna `totalExpenses`, `profit`, `expensesByCategory`, `expensesList`
+
+**Service `availability.ts`:**
+- [x] `getSlotsForProfessional` respeita o break — slots que se sobrepõem ao intervalo são removidos
+- [x] `isProfessionalAvailableAt` também checa break
+
+**UI:**
+- [x] `schedule/page.tsx` — checkbox "Intervalo" + 2 inputs de hora por dia habilitado (validação client-side: break dentro do horário)
+- [x] `financial/page.tsx` — KPIs "Despesas" e "Lucro" (owner only), seção lista de despesas, modal com categoria via `<datalist>` e botão remover
+- [x] `agenda/page.tsx` — busca por cliente com debounce 300ms (nome ou telefone, normaliza dígitos) + props `filteredAppointments` para os 4 views
+- [x] Notas do agendamento visíveis em todas as 4 views (Lista, Timeline, Semana, Kanban) com `📝` prefix e tooltip no hover
+
+**`npx tsc --noEmit`:** ✅ zero erros
+
+### FASE 9 — Módulo BI no Financeiro (3 sub-fases) · `✅ CONCLUÍDA`
+**Responsável:** Claude Opus / Sonnet
+
+Módulo robusto de Business Intelligence dentro do `/gstsantos/financial`, organizado em tabs: **Visão Geral** (atual + alertas), **Carteira**, **Ranking**, **Simulação**. Owner-only para tabs Carteira/Ranking/Simulação.
+
+**Fase 9.1 — Carteira/LTV/Retenção (sem schema novo):**
+- [x] Nova rota `GET /api/gstsantos/insights/route.ts` — owner only, 5 queries em paralelo via `Promise.all`
+- [x] Métricas implementadas:
+  - **Classificação da carteira**: Ativos (≤30d), Em Retenção (31-60d), Em Risco (61-90d), Perdidos (>90d) — por `customers.last_seen_at`
+  - **Saúde da carteira** com badge Verde/Amarelo/Vermelho (≥40% / 25-40% / <25%)
+  - **LTV** = ticket_médio × frequência_anual (com `partialData=true` se < 365d de histórico)
+  - **Frequência anual** = (total_visits ÷ clientes) × (365 ÷ dias_operação)
+  - **Taxa de 2ª visita** = clientes com 2+ COMPLETED / total
+  - **Taxa de fidelização** = clientes com 5+ COMPLETED / total
+  - **Fidelizados ativos vs totais** (5+ visitas E last_seen ≤ 30d)
+  - **Retenção mensal (cohort)** — clientes do mês anterior que voltaram este mês
+  - **Ranking de barbeiros 30d** — receita, atendimentos, ticket médio, taxa de conclusão
+- [x] Componentes: `WalletInsights.tsx` (donut + KPIs + badges semafóricas), `BarberRanking.tsx` (🥇🥈🥉 + barra de progresso)
+- [x] Refatoração de `financial/page.tsx` com sistema de tabs + fetch lazy de `/insights`
+- [x] Avisos automáticos: "Dados parciais" se histórico < 1 ano, "Poucos dados" se < 10 clientes
+
+**Fase 9.2 — Comissões + Lucratividade + Custos por Cadeira:**
+- [x] Migration `0009_commissions_and_recurring_expenses.sql`:
+  - `barber_services.commission_pct` (numeric 5,2 default 0, CHECK 0-100)
+  - `expenses.is_recurring` (boolean default false)
+  - `expenses.attributed_to_user_id` (FK user opcional — ON DELETE SET NULL)
+  - Índice `expenses_org_attributed_idx`
+- [x] Schema atualizado: `barber_services` ganha `commissionPct`, `expenses` ganha `isRecurring` + `attributedToUserId`
+- [x] APIs novas:
+  - `GET /api/gstsantos/barbers/[memberId]/commissions` — lista todos serviços ativos + % atual do barbeiro
+  - `POST` — upsert em lote: cria attach + define %
+- [x] Insights API estende ranking com profitabilidade:
+  - Query 6: SUM(price × commission_pct / 100) por barbeiro = comissão paga
+  - Query 7: despesas atribuídas por barbeiro (e não atribuídas = pool rateado)
+  - Cada barbeiro recebe: `commission`, `attributedCost`, `sharedCost` (= unattributed / N_active), `totalCost`, `chairRevenue`, `profit`, `margin`, `breakEvenCuts`
+- [x] Org-level: `profitability.orgRevenue30d`, `orgCommission30d`, `orgExpenses30d`, `orgProfit30d`, `orgMargin30d`
+- [x] UI:
+  - `BarberRanking` ganha seção expandível "Ver lucro e break-even" — mostra receita bruta, comissão, custos, lucro da cadeira, margem, break-even, capacidade
+  - `barbers/page.tsx` ganha botão "Comissões" por barbeiro → modal lista serviços com inputs de %
+  - Modal de despesas ganha checkbox "Despesa recorrente" + dropdown "Atribuir a barbeiro" (ou rateada)
+
+**Fase 9.3 — Simulação + Alertas + Exportação CSV:**
+- [x] Insights API ganha mais queries:
+  - Query 8: receita por mês (últimos 3 meses) → projeção do próximo mês = média dos meses completos
+  - Query 9: working_hours dos barbeiros ativos → minutos disponíveis em 30 dias (`(end - start - break) × 30/7` por day_of_week)
+  - Query 10: duração média dos serviços atendidos por barbeiro → capacidade = minutos / duração_média
+  - Calcula `saturation = completed / capacity` por barbeiro e org-wide
+- [x] Resposta da API ganha `production` (capacidade, saturação, projeção, histórico mensal) e `alerts` consolidados:
+  - **Saúde da carteira** (verde ≥40%, amarelo 25-40%, vermelho <25%)
+  - **Retenção mensal** (verde ≥50%, amarelo ≥30%, vermelho <30%)
+  - **Margem** (verde ≥30%, amarelo ≥15%, vermelho <15%)
+  - **Saturação das cadeiras** (verde ≥70%, amarelo ≥50%, vermelho <50%)
+- [x] Componentes novos:
+  - `SimulationTab.tsx` — calculadora interativa com 5 sliders (cadeiras, cortes/cadeira/mês, ticket, comissão %, custo fixo). Calcula receita, comissão, lucro, margem, break-even por cadeira. Botões de cenários rápidos (+1 cadeira, ticket +20%, etc.) e "Resetar aos valores reais".
+  - `AlertsCard.tsx` — exibe os 4 alertas semafóricos no topo da Visão Geral (owner only) + projeção do mês.
+- [x] Exportação CSV via `csv.ts` (utility client-side com BOM UTF-8 para Excel):
+  - Botão **Exportar CSV** em Visão Geral (receita diária), Despesas (lançamentos), Carteira (resumo dos 4 buckets), Ranking (todas as métricas de lucratividade).
+- [x] Tab "Simulação" adicionada no `financial/page.tsx`
+
+**Arquivos novos:**
+- `src/server/db/migrations/0009_commissions_and_recurring_expenses.sql`
+- `src/server/db/schema/expenses.ts` (já existia, estendida)
+- `src/app/api/gstsantos/insights/route.ts`
+- `src/app/api/gstsantos/expenses/route.ts` + `[id]/route.ts`
+- `src/app/api/gstsantos/barbers/[memberId]/commissions/route.ts`
+- `src/app/gstsantos/(protected)/financial/_components/WalletInsights.tsx`
+- `src/app/gstsantos/(protected)/financial/_components/BarberRanking.tsx`
+- `src/app/gstsantos/(protected)/financial/_components/SimulationTab.tsx`
+- `src/app/gstsantos/(protected)/financial/_components/AlertsCard.tsx`
+- `src/app/gstsantos/(protected)/financial/_components/csv.ts`
+
+**`npx tsc --noEmit`:** ✅ zero erros
+
+### Pendências de deploy (EasyPanel) — adicionais da Fase 9
+- **Aplicar migrations 0008 + 0009 em produção:** Roda automaticamente em `npm run db:migrate` na primeira inicialização (todas idempotentes — `IF NOT EXISTS`)
+- **Configurar comissões iniciais:** owner → /gstsantos/barbers → botão "Comissões" em cada barbeiro → ajustar % por serviço (default 0%)
+- **Marcar despesas existentes:** opcionalmente editar despesas para definir `is_recurring=true` (aluguel, salários) ou `attributed_to_user_id` (custos por barbeiro específico)
 
 ### Bugs conhecidos não resolvidos
 - **`canCreateServices` permite gerenciar barbers**: flag ainda se chama `canCreateServices` no DB — semântica confusa, mas funcional. UI já exibe como "Barbeiro Admin". Renomear coluna no banco é trabalho futuro sem urgência.

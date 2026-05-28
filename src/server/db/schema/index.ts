@@ -5,3 +5,4 @@ export * from "./appointments";
 export * from "./push";
 export * from "./whatsapp";
 export * from "./customers";
+export * from "./expenses";

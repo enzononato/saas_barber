@@ -42,6 +42,13 @@ export default function AgendaPage() {
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setSearchQuery(searchInput.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
@@ -52,6 +59,16 @@ export default function AgendaPage() {
   }, [date]);
 
   useEffect(() => { void fetchAppointments(); }, [fetchAppointments]);
+
+  const filteredAppointments = searchQuery
+    ? appointments.filter((a) => {
+        const q = searchQuery.toLowerCase();
+        return (
+          a.customerName.toLowerCase().includes(q) ||
+          a.customerPhone.replace(/\D/g, "").includes(searchQuery.replace(/\D/g, ""))
+        );
+      })
+    : appointments;
 
   function setView(v: View) {
     const params = new URLSearchParams(searchParams.toString());
@@ -93,6 +110,23 @@ export default function AgendaPage() {
           Agenda
         </h1>
         <input
+          type="search"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="Buscar cliente..."
+          style={{
+            padding: "6px 12px",
+            background: "#131211",
+            border: "1px solid #2A2620",
+            borderRadius: 8,
+            color: "#F4EEDF",
+            fontSize: 13,
+            marginLeft: "auto",
+            minWidth: 180,
+            outline: "none",
+          }}
+        />
+        <input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
@@ -103,7 +137,6 @@ export default function AgendaPage() {
             borderRadius: 8,
             color: "#F4EEDF",
             fontSize: 13,
-            marginLeft: "auto",
           }}
         />
       </div>
@@ -146,20 +179,20 @@ export default function AgendaPage() {
       ) : (
         <>
           {view === "list" && (
-            <AgendaList appointments={appointments} onStatusChange={updateStatus} />
+            <AgendaList appointments={filteredAppointments} onStatusChange={updateStatus} />
           )}
           {view === "timeline" && (
-            <AgendaTimeline appointments={appointments} date={date} />
+            <AgendaTimeline appointments={filteredAppointments} date={date} />
           )}
           {view === "week" && (
             <AgendaWeek
-              appointments={appointments}
+              appointments={filteredAppointments}
               date={date}
               onDateChange={setDate}
             />
           )}
           {view === "kanban" && (
-            <AgendaKanban appointments={appointments} onStatusChange={updateStatus} />
+            <AgendaKanban appointments={filteredAppointments} onStatusChange={updateStatus} />
           )}
         </>
       )}

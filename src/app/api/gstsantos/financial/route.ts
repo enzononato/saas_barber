@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 
 import { db } from "@/server/db";
 import { appointments } from "@/server/db/schema/appointments";
-import { member, user } from "@/server/db/schema/auth";
+import { user } from "@/server/db/schema/auth";
+import { expenses } from "@/server/db/schema/expenses";
 import { requireAuth } from "@/server/middleware/requireAuth";
 
 function getPeriodRange(period: string, date: string): { start: Date; end: Date } {
@@ -108,6 +109,63 @@ export async function GET(req: Request) {
       .orderBy(sql`SUM(${appointments.priceAtBooking}) DESC`);
   }
 
+  // Expenses — owner only
+  let totalExpenses = "0";
+  let expensesByCategory: Array<{ category: string | null; total: string; count: number }> = [];
+  let expensesList: Array<{
+    id: string;
+    description: string;
+    category: string | null;
+    amount: string;
+    date: string;
+  }> = [];
+
+  if (ctx.role === "owner") {
+    const fromDate = start.toISOString().slice(0, 10);
+    const toDate = end.toISOString().slice(0, 10);
+
+    const expenseConditions = [
+      eq(expenses.organizationId, ctx.orgId),
+      gte(expenses.date, fromDate),
+      lte(expenses.date, toDate),
+    ];
+
+    const [expTotals] = await db
+      .select({
+        total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)`,
+      })
+      .from(expenses)
+      .where(and(...expenseConditions));
+    totalExpenses = expTotals?.total ?? "0";
+
+    expensesByCategory = await db
+      .select({
+        category: expenses.category,
+        total: sql<string>`SUM(${expenses.amount})`,
+        count: sql<number>`COUNT(*)::int`,
+      })
+      .from(expenses)
+      .where(and(...expenseConditions))
+      .groupBy(expenses.category)
+      .orderBy(sql`SUM(${expenses.amount}) DESC`);
+
+    expensesList = await db
+      .select({
+        id: expenses.id,
+        description: expenses.description,
+        category: expenses.category,
+        amount: expenses.amount,
+        date: expenses.date,
+      })
+      .from(expenses)
+      .where(and(...expenseConditions))
+      .orderBy(sql`${expenses.date} DESC`, sql`${expenses.createdAt} DESC`);
+  }
+
+  const profit = (
+    parseFloat(totals?.total ?? "0") - parseFloat(totalExpenses)
+  ).toFixed(2);
+
   return NextResponse.json({
     period,
     date,
@@ -118,5 +176,9 @@ export async function GET(req: Request) {
     daily,
     byService,
     byBarber,
+    totalExpenses,
+    profit,
+    expensesByCategory,
+    expensesList,
   });
 }

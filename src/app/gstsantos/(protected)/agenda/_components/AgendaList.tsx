@@ -84,6 +84,24 @@ export function AgendaList({ appointments, onStatusChange }: Props) {
             <p style={{ margin: 0, color: "#8A847A", fontSize: 12 }}>
               {apt.serviceNameAtBooking} · {apt.professionalName}
             </p>
+            {apt.notes && (
+              <p
+                title={apt.notes}
+                style={{
+                  margin: "4px 0 0",
+                  color: "#8A847A",
+                  fontSize: 11,
+                  fontStyle: "italic",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical" as const,
+                }}
+              >
+                📝 {apt.notes}
+              </p>
+            )}
           </div>
 
           {/* Price */}
