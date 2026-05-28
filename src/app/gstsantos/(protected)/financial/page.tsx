@@ -122,6 +122,7 @@ export default function FinancialPage() {
   const [loading, setLoading] = useState(true);
   const [insights, setInsights] = useState<InsightsData | null>(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsError, setInsightsError] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [expForm, setExpForm] = useState({
     description: "",
@@ -148,8 +149,17 @@ export default function FinancialPage() {
   const fetchInsights = useCallback(async () => {
     if (insights) return;
     setInsightsLoading(true);
-    const res = await fetch("/api/gstsantos/insights");
-    if (res.ok) setInsights(await res.json());
+    setInsightsError(false);
+    try {
+      const res = await fetch("/api/gstsantos/insights");
+      if (res.ok) {
+        setInsights(await res.json());
+      } else {
+        setInsightsError(true);
+      }
+    } catch {
+      setInsightsError(true);
+    }
     setInsightsLoading(false);
   }, [insights]);
 
@@ -394,8 +404,10 @@ export default function FinancialPage() {
       {loading || !data ? (
         <p style={{ color: "#8A847A" }}>Carregando...</p>
       ) : tab === "wallet" ? (
-        insightsLoading || !insights ? (
+        insightsLoading ? (
           <p style={{ color: "#8A847A" }}>Carregando insights...</p>
+        ) : insightsError || !insights ? (
+          <InsightsErrorMessage onRetry={() => { setInsightsError(false); setInsights(null); }} />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
@@ -409,8 +421,10 @@ export default function FinancialPage() {
           </div>
         )
       ) : tab === "ranking" ? (
-        insightsLoading || !insights ? (
+        insightsLoading ? (
           <p style={{ color: "#8A847A" }}>Carregando ranking...</p>
+        ) : insightsError || !insights ? (
+          <InsightsErrorMessage onRetry={() => { setInsightsError(false); setInsights(null); }} />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
@@ -420,8 +434,10 @@ export default function FinancialPage() {
           </div>
         )
       ) : tab === "simulation" ? (
-        insightsLoading || !insights ? (
+        insightsLoading ? (
           <p style={{ color: "#8A847A" }}>Carregando dados...</p>
+        ) : insightsError || !insights ? (
+          <InsightsErrorMessage onRetry={() => { setInsightsError(false); setInsights(null); }} />
         ) : (
           <SimulationTab
             baseline={
@@ -886,6 +902,42 @@ export default function FinancialPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function InsightsErrorMessage({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div
+      style={{
+        background: "#131211",
+        border: "1px solid #3A2020",
+        borderRadius: 12,
+        padding: "32px 24px",
+        textAlign: "center",
+        color: "#E57373",
+      }}
+    >
+      <p style={{ margin: "0 0 8px", fontSize: 15, fontWeight: 600 }}>
+        Erro ao carregar dados de BI
+      </p>
+      <p style={{ margin: "0 0 16px", fontSize: 12, color: "#8A847A" }}>
+        Verifique se as migrações do banco foram aplicadas no servidor.
+      </p>
+      <button
+        onClick={onRetry}
+        style={{
+          padding: "7px 20px",
+          background: "transparent",
+          border: "1px solid #E57373",
+          borderRadius: 8,
+          color: "#E57373",
+          fontSize: 13,
+          cursor: "pointer",
+        }}
+      >
+        Tentar novamente
+      </button>
     </div>
   );
 }
