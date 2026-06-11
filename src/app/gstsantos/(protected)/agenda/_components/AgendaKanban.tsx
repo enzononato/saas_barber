@@ -12,6 +12,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { StickyNote } from "lucide-react";
 import type { Appointment } from "../page";
 
 type Status = Appointment["status"];
@@ -39,16 +40,16 @@ function KanbanCard({ apt, isDragging }: { apt: Appointment; isDragging?: boolea
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.4 : 1,
-    background: "#0B0B0B",
+    background: "linear-gradient(165deg, #14120E, #0B0A08)",
     border: "1px solid #2A2620",
-    borderRadius: 10,
+    borderRadius: 12,
     padding: "12px 14px",
     cursor: "grab",
     userSelect: "none",
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={style} className="kb-card" {...attributes} {...listeners}>
       <p style={{ margin: "0 0 4px", fontWeight: 600, color: "#F4EEDF", fontSize: 13 }}>
         {apt.customerName}
       </p>
@@ -73,7 +74,8 @@ function KanbanCard({ apt, isDragging }: { apt: Appointment; isDragging?: boolea
             WebkitBoxOrient: "vertical" as const,
           }}
         >
-          📝 {apt.notes}
+          <StickyNote size={10} style={{ display: "inline", verticalAlign: "-1px", marginRight: 4 }} />
+          {apt.notes}
         </p>
       )}
     </div>
@@ -142,11 +144,13 @@ export function AgendaKanban({ appointments: initial, onStatusChange }: Props) {
             <div
               key={col.key}
               style={{
-                background: "#131211",
+                background: "linear-gradient(180deg, rgba(244,238,223,0.03), rgba(244,238,223,0.006))",
                 border: "1px solid #2A2620",
-                borderRadius: 12,
+                borderTop: `2px solid ${col.color}66`,
+                borderRadius: 14,
                 padding: 12,
                 minHeight: 200,
+                transition: "border-color .25s",
               }}
             >
               <div
@@ -207,12 +211,14 @@ export function AgendaKanban({ appointments: initial, onStatusChange }: Props) {
         {draggingApt ? (
           <div
             style={{
-              background: "#0B0B0B",
-              border: "1px solid #C9A84C44",
-              borderRadius: 10,
+              background: "linear-gradient(165deg, #1A1710, #0E0C08)",
+              border: "1px solid rgba(201,168,76,0.55)",
+              borderRadius: 12,
               padding: "12px 14px",
-              boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+              boxShadow:
+                "0 16px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(201,168,76,0.2), 0 0 28px -8px rgba(201,168,76,0.45)",
               cursor: "grabbing",
+              transform: "rotate(2deg) scale(1.04)",
             }}
           >
             <p style={{ margin: 0, fontWeight: 600, color: "#F4EEDF", fontSize: 13 }}>
@@ -224,6 +230,15 @@ export function AgendaKanban({ appointments: initial, onStatusChange }: Props) {
           </div>
         ) : null}
       </DragOverlay>
+
+      <style>{`
+        .kb-card { transition: border-color .2s, box-shadow .2s, transform .2s; }
+        .kb-card:hover {
+          border-color: rgba(201,168,76,0.4) !important;
+          box-shadow: 0 8px 20px -10px rgba(0,0,0,0.6);
+        }
+        .kb-card:active { cursor: grabbing; }
+      `}</style>
     </DndContext>
   );
 }

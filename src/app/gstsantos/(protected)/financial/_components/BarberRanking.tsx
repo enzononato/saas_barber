@@ -26,7 +26,7 @@ interface Props {
   ranking: RankingEntry[];
 }
 
-const MEDALS = ["🥇", "🥈", "🥉"];
+const MEDAL_COLORS = ["#E0BE5C", "#C0C0C0", "#CD7F32"];
 
 function fmtR$(v: string | number) {
   return `R$ ${parseFloat(String(v)).toFixed(2).replace(".", ",")}`;
@@ -37,18 +37,10 @@ export function BarberRanking({ ranking }: Props) {
 
   if (ranking.length === 0) {
     return (
-      <div
-        style={{
-          background: "#131211",
-          border: "1px solid #2A2620",
-          borderRadius: 12,
-          padding: "40px 20px",
-          textAlign: "center",
-          color: "#8A847A",
-          fontSize: 13,
-        }}
-      >
-        Nenhum atendimento registrado nos últimos 30 dias.
+      <div className="empty">
+        <p style={{ margin: 0, fontSize: 13 }}>
+          Nenhum atendimento registrado nos últimos 30 dias.
+        </p>
       </div>
     );
   }
@@ -56,14 +48,7 @@ export function BarberRanking({ ranking }: Props) {
   const topRevenue = parseFloat(ranking[0]?.revenue ?? "0");
 
   return (
-    <div
-      style={{
-        background: "#131211",
-        border: "1px solid #2A2620",
-        borderRadius: 12,
-        padding: "18px 20px",
-      }}
-    >
+    <div className="gst-card" style={{ padding: "18px 20px" }}>
       <div
         style={{
           display: "flex",
@@ -72,7 +57,17 @@ export function BarberRanking({ ranking }: Props) {
           marginBottom: 14,
         }}
       >
-        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#C8C2B4" }}>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 11,
+            fontWeight: 600,
+            color: "#C9A84C",
+            fontFamily: "'JetBrains Mono', monospace",
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+          }}
+        >
           Ranking dos últimos 30 dias
         </p>
         <span
@@ -95,7 +90,7 @@ export function BarberRanking({ ranking }: Props) {
         {ranking.map((b, i) => {
           const revenue = parseFloat(b.revenue);
           const widthPct = topRevenue > 0 ? (revenue / topRevenue) * 100 : 0;
-          const medal = MEDALS[i] ?? `${i + 1}º`;
+          const medalColor = MEDAL_COLORS[i];
           const rateColor =
             b.completedRate >= 85 ? "#4CAF50" : b.completedRate >= 70 ? "#E0BE5C" : "#E57373";
           const profitValue = parseFloat(b.profit);
@@ -105,11 +100,12 @@ export function BarberRanking({ ranking }: Props) {
           return (
             <div
               key={b.id}
+              className="gst-row"
               style={{
                 padding: "14px 16px",
-                background: "#0B0B0B",
+                background: "linear-gradient(165deg, #100E0B, #0A0908)",
                 border: "1px solid #2A2620",
-                borderRadius: 10,
+                borderRadius: 12,
                 display: "flex",
                 flexDirection: "column",
                 gap: 10,
@@ -126,14 +122,24 @@ export function BarberRanking({ ranking }: Props) {
               >
                 <span
                   style={{
-                    fontSize: i < 3 ? 22 : 14,
-                    fontWeight: 700,
-                    color: i < 3 ? "#C9A84C" : "#8A847A",
-                    minWidth: 32,
-                    textAlign: "center",
+                    width: 32,
+                    height: 32,
+                    borderRadius: "50%",
+                    display: "grid",
+                    placeItems: "center",
+                    fontSize: 13,
+                    fontWeight: 800,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    color: medalColor ? "#1A1408" : "#8A847A",
+                    background: medalColor
+                      ? `linear-gradient(180deg, ${medalColor}, ${medalColor}99)`
+                      : "rgba(244,238,223,0.05)",
+                    border: medalColor ? "none" : "1px solid #2A2620",
+                    boxShadow: medalColor ? `0 0 14px -4px ${medalColor}88` : "none",
+                    flexShrink: 0,
                   }}
                 >
-                  {medal}
+                  {i + 1}
                 </span>
                 <span
                   style={{

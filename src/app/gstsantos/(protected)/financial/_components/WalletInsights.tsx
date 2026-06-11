@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertTriangle, Info } from "lucide-react";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
 
 export interface WalletData {
@@ -81,7 +82,8 @@ export function WalletInsights({ wallet, ltv, retention }: Props) {
             fontSize: 12,
           }}
         >
-          ⚠️ Poucos dados ({ltv.customerCount} clientes). Os indicadores ficam mais confiáveis a
+          <AlertTriangle size={13} style={{ display: "inline", verticalAlign: "-2px", marginRight: 6 }} />
+          Poucos dados ({ltv.customerCount} clientes). Os indicadores ficam mais confiáveis a
           partir de 10+ clientes com histórico.
         </div>
       )}
@@ -265,7 +267,8 @@ export function WalletInsights({ wallet, ltv, retention }: Props) {
         </div>
         {ltv.partialData && ltv.operationDays > 0 && (
           <p style={{ margin: "12px 0 0", fontSize: 11, color: "#8A847A", fontStyle: "italic" }}>
-            ℹ️ Frequência anual extrapolada a partir de {ltv.operationDays} dias de histórico. Os
+            <Info size={12} style={{ display: "inline", verticalAlign: "-2px", marginRight: 5 }} />
+            Frequência anual extrapolada a partir de {ltv.operationDays} dias de histórico. Os
             valores se estabilizam após 1 ano de operação.
           </p>
         )}
@@ -374,26 +377,21 @@ function KpiCard({
   accent?: string;
 }) {
   return (
-    <div
-      style={{
-        background: "#131211",
-        border: "1px solid #2A2620",
-        borderRadius: 12,
-        padding: "14px 16px",
-      }}
-    >
-      <p
-        style={{
-          margin: "0 0 4px",
-          fontSize: 10,
-          color: "#8A847A",
-          textTransform: "uppercase",
-          letterSpacing: "0.12em",
-        }}
-      >
+    <div className="gst-kpi" style={{ padding: "14px 16px" }}>
+      <p className="k-label" style={{ margin: "0 0 4px" }}>
         {label}
       </p>
-      <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: accent }}>{value}</p>
+      <p
+        style={{
+          margin: 0,
+          fontSize: 21,
+          fontWeight: 700,
+          fontFamily: "'Playfair Display', serif",
+          color: accent,
+        }}
+      >
+        {value}
+      </p>
       {sub && (
         <p style={{ margin: "4px 0 0", fontSize: 11, color: "#8A847A" }}>{sub}</p>
       )}
@@ -411,16 +409,21 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div
-      style={{
-        background: "#131211",
-        border: "1px solid #2A2620",
-        borderRadius: 12,
-        padding: "18px 20px",
-      }}
-    >
+    <div className="gst-card" style={{ padding: "18px 20px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#C8C2B4" }}>{title}</p>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 11,
+            fontWeight: 600,
+            color: "#C9A84C",
+            fontFamily: "'JetBrains Mono', monospace",
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+          }}
+        >
+          {title}
+        </p>
         {badge && (
           <span
             style={{

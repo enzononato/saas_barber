@@ -328,15 +328,18 @@ function Scenario({
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div
-      style={{
-        background: "#131211",
-        border: "1px solid #2A2620",
-        borderRadius: 12,
-        padding: "18px 20px",
-      }}
-    >
-      <p style={{ margin: "0 0 14px", fontSize: 13, fontWeight: 600, color: "#C8C2B4" }}>
+    <div className="gst-card" style={{ padding: "18px 20px" }}>
+      <p
+        style={{
+          margin: "0 0 14px",
+          fontSize: 11,
+          fontWeight: 600,
+          color: "#C9A84C",
+          fontFamily: "'JetBrains Mono', monospace",
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+        }}
+      >
         {title}
       </p>
       {children}

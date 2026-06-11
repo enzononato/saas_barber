@@ -139,39 +139,11 @@ export default function AgendaPage() {
   }
 
   return (
-    <div style={{ padding: "24px 20px", maxWidth: 1100, margin: "0 auto" }}>
+    <div className="gst-page">
       {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          gap: 12,
-          marginBottom: 24,
-        }}
-      >
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F4EEDF", margin: 0 }}>
-          Agenda
-        </h1>
-        <button
-          onClick={() => setNewOpen(true)}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 7,
-            padding: "9px 18px",
-            minHeight: 38,
-            background: "linear-gradient(180deg,#E0BE5C,#C9A84C 48%,#8E6A24)",
-            color: "#1A1408",
-            fontWeight: 700,
-            fontSize: 13,
-            border: "none",
-            borderRadius: 999,
-            cursor: "pointer",
-            transition: "transform 0.15s, box-shadow 0.15s",
-            boxShadow: "0 8px 20px -8px rgba(201,168,76,0.5)",
-          }}
-        >
+      <div className="gst-head">
+        <h1 className="gst-title">Agenda</h1>
+        <button onClick={() => setNewOpen(true)} className="gst-btn gst-btn-gold">
           <Plus size={15} strokeWidth={2.5} />
           Novo agendamento
         </button>
@@ -180,62 +152,25 @@ export default function AgendaPage() {
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           placeholder="Buscar cliente..."
-          style={{
-            padding: "8px 12px",
-            background: "#131211",
-            border: "1px solid #2A2620",
-            borderRadius: 8,
-            color: "#F4EEDF",
-            fontSize: 13,
-            marginLeft: "auto",
-            minWidth: 180,
-            outline: "none",
-          }}
+          className="gst-input"
+          style={{ marginLeft: "auto", minWidth: 180, fontSize: 13 }}
         />
         <input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          style={{
-            padding: "8px 12px",
-            background: "#131211",
-            border: "1px solid #2A2620",
-            borderRadius: 8,
-            color: "#F4EEDF",
-            fontSize: 13,
-          }}
+          className="gst-input"
+          style={{ fontSize: 13 }}
         />
       </div>
 
       {/* View tabs */}
-      <div
-        style={{
-          display: "flex",
-          gap: 4,
-          marginBottom: 20,
-          background: "#131211",
-          border: "1px solid #2A2620",
-          borderRadius: 10,
-          padding: 4,
-          width: "fit-content",
-        }}
-      >
+      <div className="gst-tabs" style={{ marginBottom: 20 }}>
         {VIEWS.map((v) => (
           <button
             key={v.key}
             onClick={() => setView(v.key)}
-            style={{
-              padding: "7px 16px",
-              minHeight: 34,
-              borderRadius: 7,
-              border: "none",
-              background: view === v.key ? "rgba(201,168,76,0.15)" : "transparent",
-              color: view === v.key ? "#C9A84C" : "#8A847A",
-              fontWeight: view === v.key ? 600 : 400,
-              fontSize: 13,
-              cursor: "pointer",
-              transition: "all 0.15s",
-            }}
+            className={`gst-tab${view === v.key ? " on" : ""}`}
           >
             {v.label}
           </button>
@@ -243,7 +178,11 @@ export default function AgendaPage() {
       </div>
 
       {loading ? (
-        <p style={{ color: "#8A847A" }}>Carregando...</p>
+        <div style={{ display: "grid", gap: 10 }}>
+          <div className="gst-skel" style={{ height: 72 }} />
+          <div className="gst-skel" style={{ height: 72, opacity: 0.7 }} />
+          <div className="gst-skel" style={{ height: 72, opacity: 0.45 }} />
+        </div>
       ) : (
         <>
           {view === "list" && (

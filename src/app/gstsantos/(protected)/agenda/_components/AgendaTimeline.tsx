@@ -1,5 +1,7 @@
 "use client";
 
+import { CalendarX2, StickyNote } from "lucide-react";
+
 import type { Appointment } from "../page";
 
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 07:00 – 20:00
@@ -33,16 +35,9 @@ export function AgendaTimeline({ appointments, date }: Props) {
 
   if (professionals.length === 0) {
     return (
-      <div
-        style={{
-          textAlign: "center",
-          padding: "60px 20px",
-          color: "#8A847A",
-          border: "1px solid #2A2620",
-          borderRadius: 12,
-        }}
-      >
-        Nenhum agendamento neste dia.
+      <div className="empty">
+        <CalendarX2 className="ic" strokeWidth={1.4} />
+        <p style={{ margin: 0, fontSize: 14 }}>Nenhum agendamento neste dia.</p>
       </div>
     );
   }
@@ -51,11 +46,10 @@ export function AgendaTimeline({ appointments, date }: Props) {
 
   return (
     <div
+      className="gst-card"
       style={{
         overflowX: "auto",
-        background: "#131211",
-        border: "1px solid #2A2620",
-        borderRadius: 12,
+        padding: 0,
       }}
     >
       {/* Header row */}
@@ -174,7 +168,8 @@ export function AgendaTimeline({ appointments, date }: Props) {
                           textOverflow: "ellipsis",
                         }}
                       >
-                        📝 {apt.notes}
+                        <StickyNote size={9} style={{ display: "inline", verticalAlign: "-1px", marginRight: 3 }} />
+                        {apt.notes}
                       </p>
                     )}
                   </div>

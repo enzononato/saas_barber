@@ -128,36 +128,21 @@ export default function ProductsPage() {
   }
 
   return (
-    <div style={{ padding: "24px 20px", maxWidth: 900, margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F4EEDF", margin: 0 }}>
-          Produtos
-        </h1>
-        <button
-          onClick={openCreate}
-          style={{
-            marginLeft: "auto",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "9px 18px",
-            background: "linear-gradient(180deg,#E0BE5C,#C9A84C 48%,#8E6A24)",
-            color: "#1A1408",
-            fontWeight: 700,
-            fontSize: 13,
-            border: "none",
-            borderRadius: 999,
-            cursor: "pointer",
-            transition: "transform 0.15s",
-          }}
-        >
+    <div className="gst-page" style={{ maxWidth: 900 }}>
+      <div className="gst-head">
+        <h1 className="gst-title">Produtos</h1>
+        <button onClick={openCreate} className="gst-btn gst-btn-gold" style={{ marginLeft: "auto" }}>
           <Plus size={15} strokeWidth={2.5} />
           Novo produto
         </button>
       </div>
 
       {loading ? (
-        <p style={{ color: "#8A847A" }}>Carregando...</p>
+        <div style={{ display: "grid", gap: 10 }}>
+          <div className="gst-skel" style={{ height: 72 }} />
+          <div className="gst-skel" style={{ height: 72, opacity: 0.7 }} />
+          <div className="gst-skel" style={{ height: 72, opacity: 0.45 }} />
+        </div>
       ) : products.length === 0 ? (
         <div
           style={{
@@ -175,7 +160,7 @@ export default function ProductsPage() {
           </p>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className="gst-stagger" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {products.map((p) => {
             const margin =
               parseFloat(p.price) > 0
@@ -186,10 +171,8 @@ export default function ProductsPage() {
             return (
               <div
                 key={p.id}
+                className="gst-card gst-card-hover"
                 style={{
-                  background: "#131211",
-                  border: "1px solid #2A2620",
-                  borderRadius: 12,
                   padding: "16px 20px",
                   display: "flex",
                   flexWrap: "wrap",

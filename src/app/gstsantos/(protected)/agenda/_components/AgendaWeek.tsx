@@ -1,5 +1,7 @@
 "use client";
 
+import { ChevronLeft, ChevronRight, StickyNote } from "lucide-react";
+
 import type { Appointment } from "../page";
 
 interface Props {
@@ -32,14 +34,7 @@ export function AgendaWeek({ appointments, date, onDateChange }: Props) {
   const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <div
-      style={{
-        background: "#131211",
-        border: "1px solid #2A2620",
-        borderRadius: 12,
-        overflow: "hidden",
-      }}
-    >
+    <div className="gst-card" style={{ overflow: "hidden", padding: 0 }}>
       {/* Week nav */}
       <div
         style={{
@@ -56,9 +51,11 @@ export function AgendaWeek({ appointments, date, onDateChange }: Props) {
             prev.setUTCDate(prev.getUTCDate() - 7);
             onDateChange(isoDate(prev));
           }}
-          style={navBtn}
+          className="gst-btn gst-btn-ghost"
+          style={{ minHeight: 36, padding: "6px 14px" }}
+          aria-label="Semana anterior"
         >
-          ←
+          <ChevronLeft size={16} />
         </button>
         <span style={{ color: "#C8C2B4", fontSize: 13 }}>
           {weekDays[0].toLocaleDateString("pt-BR", { day: "2-digit", month: "short", timeZone: "UTC" })} –{" "}
@@ -70,9 +67,11 @@ export function AgendaWeek({ appointments, date, onDateChange }: Props) {
             next.setUTCDate(next.getUTCDate() + 7);
             onDateChange(isoDate(next));
           }}
-          style={navBtn}
+          className="gst-btn gst-btn-ghost"
+          style={{ minHeight: 36, padding: "6px 14px" }}
+          aria-label="Próxima semana"
         >
-          →
+          <ChevronRight size={16} />
         </button>
       </div>
 
@@ -172,7 +171,8 @@ export function AgendaWeek({ appointments, date, onDateChange }: Props) {
                             textOverflow: "ellipsis",
                           }}
                         >
-                          📝 {apt.notes}
+                          <StickyNote size={9} style={{ display: "inline", verticalAlign: "-1px", marginRight: 3 }} />
+                          {apt.notes}
                         </p>
                       )}
                     </div>
@@ -186,13 +186,3 @@ export function AgendaWeek({ appointments, date, onDateChange }: Props) {
     </div>
   );
 }
-
-const navBtn: React.CSSProperties = {
-  background: "#0B0B0B",
-  border: "1px solid #2A2620",
-  borderRadius: 8,
-  color: "#C8C2B4",
-  padding: "4px 12px",
-  cursor: "pointer",
-  fontSize: 14,
-};

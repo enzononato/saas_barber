@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Search, UsersRound } from "lucide-react";
 
 type LoyaltyTier = "novo" | "recorrente" | "fiel" | "vip";
 
@@ -100,26 +101,42 @@ export default function CustomersPage() {
   }, [items, tier]);
 
   return (
-    <div style={{ padding: "24px 20px", maxWidth: 900, margin: "0 auto" }}>
-      <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F4EEDF", margin: "0 0 4px" }}>
-        Clientes
-      </h1>
-      <p style={{ margin: "0 0 20px", color: "#8A847A", fontSize: 13 }}>
+    <div className="gst-page" style={{ maxWidth: 900 }}>
+      <div className="gst-head" style={{ marginBottom: 4 }}>
+        <h1 className="gst-title">Clientes</h1>
+      </div>
+      <p style={{ margin: "8px 0 20px", color: "#8A847A", fontSize: 13 }}>
         {total} cliente{total !== 1 ? "s" : ""} no total
       </p>
 
       {/* Busca + Ordenação */}
       <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="🔍 Buscar por nome ou telefone..."
-          style={{ ...inputStyle, flex: "1 1 260px" }}
-        />
+        <div style={{ position: "relative", flex: "1 1 260px" }}>
+          <Search
+            size={15}
+            strokeWidth={1.8}
+            style={{
+              position: "absolute",
+              left: 13,
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "#8A847A",
+              pointerEvents: "none",
+            }}
+          />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por nome ou telefone..."
+            className="gst-input"
+            style={{ width: "100%", paddingLeft: 38 }}
+          />
+        </div>
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-          style={{ ...inputStyle, width: "auto" }}
+          className="gst-select"
+          style={{ width: "auto" }}
         >
           <option value="lastVisit">Última visita</option>
           <option value="totalVisits">Mais cortes</option>
@@ -143,21 +160,20 @@ export default function CustomersPage() {
       </div>
 
       {loading ? (
-        <p style={{ color: "#8A847A", textAlign: "center", padding: 40 }}>Carregando...</p>
+        <div style={{ display: "grid", gap: 8 }}>
+          <div className="gst-skel" style={{ height: 74 }} />
+          <div className="gst-skel" style={{ height: 74, opacity: 0.7 }} />
+          <div className="gst-skel" style={{ height: 74, opacity: 0.45 }} />
+        </div>
       ) : filtered.length === 0 ? (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "60px 20px",
-            color: "#8A847A",
-            border: "1px solid #2A2620",
-            borderRadius: 12,
-          }}
-        >
-          {debouncedSearch ? "Nenhum cliente encontrado." : "Nenhum cliente cadastrado ainda."}
+        <div className="empty">
+          <UsersRound className="ic" strokeWidth={1.4} />
+          <p style={{ margin: 0, fontSize: 14 }}>
+            {debouncedSearch ? "Nenhum cliente encontrado." : "Nenhum cliente cadastrado ainda."}
+          </p>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="gst-stagger" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {filtered.map((c) => {
             const tierStyle = TIER_LABELS[c.loyaltyTier];
             const days = daysAgo(c.lastSeenAt);
@@ -165,19 +181,14 @@ export default function CustomersPage() {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               <Link key={c.id} href={`/gstsantos/customers/${c.id}` as any} style={{ textDecoration: "none" }}>
                 <div
+                  className="gst-card gst-card-hover"
                   style={{
-                    background: "#131211",
-                    border: "1px solid #2A2620",
-                    borderRadius: 12,
                     padding: "14px 16px",
                     display: "flex",
                     alignItems: "center",
                     gap: 14,
-                    transition: "border-color 0.15s",
                     cursor: "pointer",
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#C9A84C44")}
-                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#2A2620")}
                 >
                   <div
                     style={{
@@ -293,14 +304,3 @@ function FilterChip({
     </button>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  padding: "9px 12px",
-  background: "#0B0B0B",
-  border: "1px solid #2A2620",
-  borderRadius: 8,
-  color: "#F4EEDF",
-  fontSize: 14,
-  outline: "none",
-  boxSizing: "border-box",
-};

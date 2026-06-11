@@ -215,7 +215,15 @@ export default function CustomerDetailPage() {
   }
 
   if (loading) {
-    return <p style={{ color: "#8A847A", padding: 24 }}>Carregando...</p>;
+    return (
+      <div className="gst-page" style={{ maxWidth: 900 }}>
+        <div style={{ display: "grid", gap: 12 }}>
+          <div className="gst-skel" style={{ height: 80, maxWidth: 420 }} />
+          <div className="gst-skel" style={{ height: 110 }} />
+          <div className="gst-skel" style={{ height: 200, opacity: 0.6 }} />
+        </div>
+      </div>
+    );
   }
 
   if (notFound || !customer || !analytics) {
@@ -233,13 +241,15 @@ export default function CustomerDetailPage() {
   const isOwner = me?.role === "owner";
 
   return (
-    <div style={{ padding: "24px 20px", maxWidth: 900, margin: "0 auto" }}>
+    <div className="gst-page" style={{ maxWidth: 900 }}>
       {/* Voltar */}
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       <Link
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         href={"/gstsantos/customers" as any}
-        style={{ color: "#8A847A", fontSize: 13, textDecoration: "none", display: "inline-block", marginBottom: 16 }}
+        style={{ color: "#8A847A", fontSize: 13, textDecoration: "none", display: "inline-block", marginBottom: 16, transition: "color .2s" }}
+        onMouseEnter={(e) => (e.currentTarget.style.color = "#C9A84C")}
+        onMouseLeave={(e) => (e.currentTarget.style.color = "#8A847A")}
       >
         ← Clientes
       </Link>
@@ -597,30 +607,16 @@ function KpiCard({
   accent?: string;
 }) {
   return (
-    <div
-      style={{
-        background: "#131211",
-        border: "1px solid #2A2620",
-        borderRadius: 12,
-        padding: "12px 14px",
-      }}
-    >
-      <p
-        style={{
-          margin: 0,
-          fontSize: 10,
-          textTransform: "uppercase",
-          letterSpacing: "0.12em",
-          color: "#8A847A",
-        }}
-      >
+    <div className="gst-kpi" style={{ padding: "14px 16px" }}>
+      <p className="k-label" style={{ margin: 0 }}>
         {label}
       </p>
       <p
         style={{
-          margin: "4px 0 0",
-          fontSize: 18,
+          margin: "5px 0 0",
+          fontSize: 19,
           fontWeight: 700,
+          fontFamily: "'Playfair Display', serif",
           color: accent ?? "#F4EEDF",
         }}
       >
@@ -633,16 +629,20 @@ function KpiCard({
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section
-      style={{
-        background: "#131211",
-        border: "1px solid #2A2620",
-        borderRadius: 14,
-        padding: 16,
-        marginBottom: 12,
-      }}
-    >
-      <h2 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 600, color: "#C9A84C" }}>{title}</h2>
+    <section className="gst-card" style={{ padding: 16, marginBottom: 12 }}>
+      <h2
+        style={{
+          margin: "0 0 12px",
+          fontSize: 11,
+          fontWeight: 600,
+          color: "#C9A84C",
+          fontFamily: "'JetBrains Mono', monospace",
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+        }}
+      >
+        {title}
+      </h2>
       {children}
     </section>
   );
@@ -671,8 +671,10 @@ function RankList({ items }: { items: Array<{ label: string; count: number }> })
               style={{
                 height: "100%",
                 width: `${(item.count / max) * 100}%`,
-                background: "#C9A84C",
+                background: "linear-gradient(90deg, #E8C870, #C9A84C)",
                 borderRadius: 999,
+                boxShadow: "0 0 8px rgba(201,168,76,0.4)",
+                transition: "width .6s cubic-bezier(.2,.7,.2,1)",
               }}
             />
           </div>

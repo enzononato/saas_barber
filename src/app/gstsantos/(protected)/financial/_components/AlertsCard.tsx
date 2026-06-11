@@ -1,5 +1,8 @@
 "use client";
 
+import { AlertTriangle, Check, X } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
 export interface AlertEntry {
   key: string;
   label: string;
@@ -15,11 +18,11 @@ interface Props {
 
 const LEVEL_STYLE: Record<
   string,
-  { color: string; bg: string; icon: string; label: string }
+  { color: string; bg: string; icon: LucideIcon; label: string }
 > = {
-  green: { color: "#4CAF50", bg: "rgba(76,175,80,0.1)", icon: "✓", label: "Saudável" },
-  yellow: { color: "#E0BE5C", bg: "rgba(224,190,92,0.1)", icon: "!", label: "Atenção" },
-  red: { color: "#E57373", bg: "rgba(229,115,115,0.1)", icon: "✕", label: "Crítico" },
+  green: { color: "#4CAF50", bg: "rgba(76,175,80,0.1)", icon: Check, label: "Saudável" },
+  yellow: { color: "#E0BE5C", bg: "rgba(224,190,92,0.1)", icon: AlertTriangle, label: "Atenção" },
+  red: { color: "#E57373", bg: "rgba(229,115,115,0.1)", icon: X, label: "Crítico" },
 };
 
 function fmtR$(v: string) {
@@ -28,15 +31,7 @@ function fmtR$(v: string) {
 
 export function AlertsCard({ alerts, projection }: Props) {
   return (
-    <div
-      style={{
-        background: "#131211",
-        border: "1px solid #2A2620",
-        borderRadius: 12,
-        padding: "18px 20px",
-        marginBottom: 20,
-      }}
-    >
+    <div className="gst-card" style={{ padding: "18px 20px", marginBottom: 20 }}>
       <div
         style={{
           display: "flex",
@@ -45,7 +40,17 @@ export function AlertsCard({ alerts, projection }: Props) {
           marginBottom: 14,
         }}
       >
-        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#C8C2B4" }}>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 11,
+            fontWeight: 600,
+            color: "#C9A84C",
+            fontFamily: "'JetBrains Mono', monospace",
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+          }}
+        >
           Indicadores de saúde
         </p>
         {projection && parseFloat(projection) > 0 && (
@@ -63,6 +68,7 @@ export function AlertsCard({ alerts, projection }: Props) {
       </div>
 
       <div
+        className="gst-stagger"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
@@ -71,6 +77,7 @@ export function AlertsCard({ alerts, projection }: Props) {
       >
         {alerts.map((a) => {
           const style = LEVEL_STYLE[a.level] ?? LEVEL_STYLE.yellow;
+          const Icon = style.icon;
           return (
             <div
               key={a.key}
@@ -78,10 +85,11 @@ export function AlertsCard({ alerts, projection }: Props) {
                 padding: "12px 14px",
                 background: style.bg,
                 border: `1px solid ${style.color}44`,
-                borderRadius: 10,
+                borderRadius: 12,
                 display: "flex",
                 flexDirection: "column",
                 gap: 4,
+                transition: "transform .2s cubic-bezier(.2,.7,.2,1), box-shadow .25s",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -94,11 +102,10 @@ export function AlertsCard({ alerts, projection }: Props) {
                     color: "#1A1408",
                     display: "grid",
                     placeItems: "center",
-                    fontSize: 11,
-                    fontWeight: 800,
+                    flexShrink: 0,
                   }}
                 >
-                  {style.icon}
+                  <Icon size={12} strokeWidth={3} />
                 </span>
                 <span
                   style={{

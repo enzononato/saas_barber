@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { Plus } from "lucide-react";
 
 interface Service {
   id: string;
@@ -124,29 +125,26 @@ export default function ServicesPage() {
   }
 
   return (
-    <div style={{ padding: "24px 20px", maxWidth: 900, margin: "0 auto" }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          marginBottom: 24,
-        }}
-      >
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F4EEDF", margin: 0 }}>
-          Serviços
-        </h1>
+    <div className="gst-page" style={{ maxWidth: 900 }}>
+      <div className="gst-head">
+        <h1 className="gst-title">Serviços</h1>
         {canManageServices && (
-          <button onClick={openCreate} style={primaryBtn}>
-            + Novo serviço
+          <button onClick={openCreate} className="gst-btn gst-btn-gold" style={{ marginLeft: "auto" }}>
+            <Plus size={15} strokeWidth={2.5} />
+            Novo serviço
           </button>
         )}
       </div>
 
       {loading ? (
-        <p style={{ color: "#8A847A" }}>Carregando...</p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+          <div className="gst-skel" style={{ height: 140 }} />
+          <div className="gst-skel" style={{ height: 140, opacity: 0.7 }} />
+          <div className="gst-skel" style={{ height: 140, opacity: 0.45 }} />
+        </div>
       ) : (
         <div
+          className="gst-stagger"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
@@ -156,10 +154,8 @@ export default function ServicesPage() {
           {services.map((svc) => (
             <div
               key={svc.id}
+              className="gst-card gst-card-hover"
               style={{
-                background: "#131211",
-                border: `1px solid ${svc.isActive ? "#2A2620" : "#1E1C1A"}`,
-                borderRadius: 12,
                 padding: "16px 18px",
                 opacity: svc.isActive ? 1 : 0.55,
               }}
@@ -201,10 +197,12 @@ export default function ServicesPage() {
                 {me?.role === "member" && (
                   <button
                     onClick={() => void toggleAttach(svc)}
+                    className={`gst-btn ${svc.isAttached ? "gst-btn-danger" : "gst-btn-ghost"}`}
                     style={{
-                      ...ghostBtn,
-                      borderColor: svc.isAttached ? "#E57373" : "#C9A84C",
-                      color: svc.isAttached ? "#E57373" : "#C9A84C",
+                      fontSize: 12,
+                      minHeight: 32,
+                      padding: "5px 14px",
+                      ...(svc.isAttached ? {} : { borderColor: "#C9A84C", color: "#C9A84C" }),
                     }}
                   >
                     {svc.isAttached ? "Remover" : "Me atrelar"}
@@ -212,12 +210,17 @@ export default function ServicesPage() {
                 )}
                 {canManageServices && (
                   <>
-                    <button onClick={() => openEdit(svc)} style={ghostBtn}>
+                    <button
+                      onClick={() => openEdit(svc)}
+                      className="gst-btn gst-btn-ghost"
+                      style={{ fontSize: 12, minHeight: 32, padding: "5px 14px" }}
+                    >
                       Editar
                     </button>
                     <button
                       onClick={() => void toggleActive(svc)}
-                      style={{ ...ghostBtn, color: "#8A847A", borderColor: "#3A3630" }}
+                      className="gst-btn gst-btn-ghost"
+                      style={{ fontSize: 12, minHeight: 32, padding: "5px 14px", color: "#8A847A" }}
                     >
                       {svc.isActive ? "Desativar" : "Ativar"}
                     </button>
@@ -231,31 +234,20 @@ export default function ServicesPage() {
 
       {/* Modal */}
       {modal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.7)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 20,
-            zIndex: 100,
-          }}
-          onClick={() => setModal(null)}
-        >
+        <div className="gst-overlay" onClick={() => setModal(null)}>
           <div
-            style={{
-              background: "#131211",
-              border: "1px solid #2A2620",
-              borderRadius: 16,
-              padding: 28,
-              width: "100%",
-              maxWidth: 420,
-            }}
+            className="gst-modal"
+            style={{ maxWidth: 420, padding: 28 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ margin: "0 0 20px", color: "#F4EEDF", fontSize: 18 }}>
+            <h2
+              style={{
+                margin: "0 0 20px",
+                color: "#F4EEDF",
+                fontSize: 19,
+                fontFamily: "'Playfair Display', serif",
+              }}
+            >
               {modal.mode === "create" ? "Novo serviço" : "Editar serviço"}
             </h2>
 
@@ -263,7 +255,7 @@ export default function ServicesPage() {
               <input
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                style={inputStyle}
+                className="gst-input" style={{ width: "100%" }}
                 placeholder="Ex: Corte degradê"
               />
             </Field>
@@ -271,7 +263,7 @@ export default function ServicesPage() {
               <input
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                style={inputStyle}
+                className="gst-input" style={{ width: "100%" }}
               />
             </Field>
             <Field label="Duração (minutos)">
@@ -280,7 +272,7 @@ export default function ServicesPage() {
                 min={5}
                 value={form.durationMinutes}
                 onChange={(e) => setForm((f) => ({ ...f, durationMinutes: e.target.value }))}
-                style={inputStyle}
+                className="gst-input" style={{ width: "100%" }}
               />
             </Field>
             <Field label="Preço (R$)">
@@ -290,18 +282,19 @@ export default function ServicesPage() {
                 step={0.01}
                 value={form.price}
                 onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-                style={inputStyle}
+                className="gst-input" style={{ width: "100%" }}
               />
             </Field>
 
             <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
-              <button onClick={() => setModal(null)} style={{ ...ghostBtn, flex: 1 }}>
+              <button onClick={() => setModal(null)} className="gst-btn gst-btn-ghost" style={{ flex: 1 }}>
                 Cancelar
               </button>
               <button
                 onClick={() => void handleSave()}
                 disabled={saving || !form.name}
-                style={{ ...primaryBtn, flex: 1 }}
+                className="gst-btn gst-btn-gold"
+                style={{ flex: 1 }}
               >
                 {saving ? "Salvando..." : "Salvar"}
               </button>
@@ -333,36 +326,3 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "9px 12px",
-  background: "#0B0B0B",
-  border: "1px solid #2A2620",
-  borderRadius: 8,
-  color: "#F4EEDF",
-  fontSize: 14,
-  outline: "none",
-  boxSizing: "border-box",
-};
-
-const primaryBtn: React.CSSProperties = {
-  padding: "8px 18px",
-  background: "linear-gradient(180deg,#E0BE5C,#C9A84C 48%,#8E6A24)",
-  color: "#1A1408",
-  fontWeight: 700,
-  fontSize: 13,
-  border: "none",
-  borderRadius: 999,
-  cursor: "pointer",
-  marginLeft: "auto",
-};
-
-const ghostBtn: React.CSSProperties = {
-  padding: "6px 14px",
-  background: "transparent",
-  border: "1px solid #2A2620",
-  borderRadius: 999,
-  color: "#C8C2B4",
-  fontSize: 12,
-  cursor: "pointer",
-};

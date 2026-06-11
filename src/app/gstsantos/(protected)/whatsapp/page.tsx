@@ -279,7 +279,7 @@ export default function WhatsappPage() {
   const isConnected = settings.connectionStatus === "connected";
 
   return (
-    <div style={{ padding: "24px 20px", maxWidth: 720, margin: "0 auto" }}>
+    <div className="gst-page" style={{ maxWidth: 720 }}>
       <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F4EEDF", margin: "0 0 24px" }}>
         WhatsApp
       </h1>
@@ -318,7 +318,7 @@ export default function WhatsappPage() {
             <p style={{ margin: "0 0 14px", color: "#8A847A", fontSize: 13 }}>
               Conecte seu WhatsApp para enviar mensagens automáticas aos clientes.
             </p>
-            <button onClick={() => void handleConnect()} disabled={connecting} style={primaryBtn}>
+            <button onClick={() => void handleConnect()} disabled={connecting} className="gst-btn gst-btn-gold">
               {connecting ? "Iniciando..." : "Conectar WhatsApp"}
             </button>
           </div>
@@ -420,7 +420,7 @@ export default function WhatsappPage() {
       )}
 
       <div style={{ display: "flex", gap: 10, marginTop: 24, flexWrap: "wrap" }}>
-        <button onClick={() => void save()} disabled={saving} style={primaryBtn}>
+        <button onClick={() => void save()} disabled={saving} className="gst-btn gst-btn-gold">
           {saving ? "Salvando..." : "Salvar configurações"}
         </button>
         {isConnected && (
@@ -518,7 +518,7 @@ export default function WhatsappPage() {
               <button
                 onClick={() => void refetchQr()}
                 disabled={refetchingQr}
-                style={{ ...primaryBtn, flex: 1, marginLeft: 0 }}
+                className="gst-btn gst-btn-gold" style={{ flex: 1 }}
               >
                 {refetchingQr ? "Gerando..." : "Gerar novo QR"}
               </button>
@@ -648,16 +648,6 @@ const rowBetween: React.CSSProperties = {
   gap: 12,
 };
 
-const primaryBtn: React.CSSProperties = {
-  padding: "10px 22px",
-  background: "linear-gradient(180deg,#E0BE5C,#C9A84C 48%,#8E6A24)",
-  color: "#1A1408",
-  fontWeight: 700,
-  fontSize: 13,
-  border: "none",
-  borderRadius: 999,
-  cursor: "pointer",
-};
 
 const ghostBtn: React.CSSProperties = {
   padding: "10px 18px",

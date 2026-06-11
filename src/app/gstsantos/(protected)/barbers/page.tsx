@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { Check, Plus } from "lucide-react";
 
 interface Barber {
   memberId: string;
@@ -174,34 +175,31 @@ export default function BarbersPage() {
   const canManage = me?.role === "owner";
 
   return (
-    <div style={{ padding: "24px 20px", maxWidth: 800, margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F4EEDF", margin: 0, flex: 1 }}>
+    <div className="gst-page" style={{ maxWidth: 800 }}>
+      <div className="gst-head">
+        <h1 className="gst-title" style={{ flex: 1 }}>
           Equipe
         </h1>
         {canManage && (
-          <button onClick={() => setShowModal(true)} style={primaryBtn}>
-            + Adicionar
+          <button onClick={() => setShowModal(true)} className="gst-btn gst-btn-gold">
+            <Plus size={15} strokeWidth={2.5} />
+            Adicionar
           </button>
         )}
       </div>
 
       {loading ? (
-        <p style={{ color: "#8A847A" }}>Carregando...</p>
+        <div style={{ display: "grid", gap: 10 }}>
+          <div className="gst-skel" style={{ height: 76 }} />
+          <div className="gst-skel" style={{ height: 76, opacity: 0.7 }} />
+          <div className="gst-skel" style={{ height: 76, opacity: 0.45 }} />
+        </div>
       ) : barbers.length === 0 ? (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "60px 20px",
-            color: "#8A847A",
-            border: "1px solid #2A2620",
-            borderRadius: 12,
-          }}
-        >
-          Nenhum membro cadastrado.
+        <div className="empty">
+          <p style={{ margin: 0, fontSize: 14 }}>Nenhum membro cadastrado.</p>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className="gst-stagger" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {barbers.map((b) => {
             const isMe = b.userId === me?.id;
             const isOwnerBarber = b.role === "owner" && b.isBarber;
@@ -210,10 +208,8 @@ export default function BarbersPage() {
             return (
               <div
                 key={b.memberId}
+                className="gst-card gst-card-hover"
                 style={{
-                  background: "#131211",
-                  border: "1px solid #2A2620",
-                  borderRadius: 12,
                   padding: "14px 18px",
                   display: "flex",
                   alignItems: "center",
@@ -336,31 +332,20 @@ export default function BarbersPage() {
 
       {/* Create modal */}
       {showModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.7)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 20,
-            zIndex: 100,
-          }}
-          onClick={() => setShowModal(false)}
-        >
+        <div className="gst-overlay" onClick={() => setShowModal(false)}>
           <div
-            style={{
-              background: "#131211",
-              border: "1px solid #2A2620",
-              borderRadius: 16,
-              padding: 28,
-              width: "100%",
-              maxWidth: 400,
-            }}
+            className="gst-modal"
+            style={{ maxWidth: 400, padding: 28 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ margin: "0 0 6px", color: "#F4EEDF", fontSize: 18 }}>
+            <h2
+              style={{
+                margin: "0 0 6px",
+                color: "#F4EEDF",
+                fontSize: 19,
+                fontFamily: "'Playfair Display', serif",
+              }}
+            >
               Adicionar membro da equipe
             </h2>
             <p style={{ margin: "0 0 20px", color: "#8A847A", fontSize: 13 }}>
@@ -371,7 +356,7 @@ export default function BarbersPage() {
               <input
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                style={inputStyle}
+                className="gst-input" style={{ width: "100%" }}
                 placeholder="Nome completo"
               />
             </Field>
@@ -380,7 +365,7 @@ export default function BarbersPage() {
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                style={inputStyle}
+                className="gst-input" style={{ width: "100%" }}
                 placeholder="email@exemplo.com"
               />
             </Field>
@@ -409,13 +394,14 @@ export default function BarbersPage() {
             </Field>
 
             <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
-              <button onClick={() => setShowModal(false)} style={{ ...ghostBtn, flex: 1 }}>
+              <button onClick={() => setShowModal(false)} className="gst-btn gst-btn-ghost" style={{ flex: 1 }}>
                 Cancelar
               </button>
               <button
                 onClick={() => void handleCreate()}
                 disabled={saving || !form.name || !form.email}
-                style={{ ...primaryBtn, flex: 1, marginLeft: 0, opacity: saving || !form.name || !form.email ? 0.5 : 1 }}
+                className="gst-btn gst-btn-gold"
+                style={{ flex: 1 }}
               >
                 {saving ? "Criando..." : "Criar"}
               </button>
@@ -426,33 +412,20 @@ export default function BarbersPage() {
 
       {/* Commissions modal */}
       {commissionsBarber && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.7)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 20,
-            zIndex: 100,
-          }}
-          onClick={() => setCommissionsBarber(null)}
-        >
+        <div className="gst-overlay" onClick={() => setCommissionsBarber(null)}>
           <div
-            style={{
-              background: "#131211",
-              border: "1px solid #2A2620",
-              borderRadius: 16,
-              padding: 24,
-              width: "100%",
-              maxWidth: 520,
-              maxHeight: "85vh",
-              overflowY: "auto",
-            }}
+            className="gst-modal"
+            style={{ maxWidth: 520, padding: 24 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ margin: "0 0 4px", color: "#F4EEDF", fontSize: 18 }}>
+            <h2
+              style={{
+                margin: "0 0 4px",
+                color: "#F4EEDF",
+                fontSize: 19,
+                fontFamily: "'Playfair Display', serif",
+              }}
+            >
               Comissões de {commissionsBarber.name}
             </h2>
             <p style={{ margin: "0 0 18px", color: "#8A847A", fontSize: 12 }}>
@@ -519,19 +492,16 @@ export default function BarbersPage() {
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
               <button
                 onClick={() => setCommissionsBarber(null)}
-                style={{ ...ghostBtn, flex: 1 }}
+                className="gst-btn gst-btn-ghost"
+                style={{ flex: 1 }}
               >
                 Cancelar
               </button>
               <button
                 onClick={() => void saveCommissions()}
                 disabled={commissionsSaving || commissionsLoading}
-                style={{
-                  ...primaryBtn,
-                  flex: 1,
-                  marginLeft: 0,
-                  opacity: commissionsSaving || commissionsLoading ? 0.5 : 1,
-                }}
+                className="gst-btn gst-btn-gold"
+                style={{ flex: 1 }}
               >
                 {commissionsSaving ? "Salvando..." : "Salvar"}
               </button>
@@ -542,43 +512,23 @@ export default function BarbersPage() {
 
       {/* Invite sent modal */}
       {invited && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.75)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 20,
-            zIndex: 100,
-          }}
-        >
-          <div
-            style={{
-              background: "#131211",
-              border: "1px solid #2A2620",
-              borderRadius: 16,
-              padding: 28,
-              width: "100%",
-              maxWidth: 400,
-            }}
-          >
+        <div className="gst-overlay">
+          <div className="gst-modal" style={{ maxWidth: 400, padding: 28 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
               <div
                 style={{
-                  width: 36,
-                  height: 36,
+                  width: 38,
+                  height: 38,
                   borderRadius: "50%",
                   background: "rgba(74,222,128,0.15)",
+                  border: "1px solid rgba(74,222,128,0.4)",
                   display: "grid",
                   placeItems: "center",
                   color: "#4ADE80",
-                  fontSize: 18,
-                  fontWeight: 700,
+                  animation: "ringIn .5s cubic-bezier(.2,.7,.2,1)",
                 }}
               >
-                ✓
+                <Check size={18} strokeWidth={2.5} />
               </div>
               <div>
                 <p style={{ margin: 0, fontWeight: 700, color: "#F4EEDF", fontSize: 16 }}>
@@ -598,7 +548,8 @@ export default function BarbersPage() {
 
             <button
               onClick={() => setInvited(null)}
-              style={{ ...primaryBtn, width: "100%", marginLeft: 0 }}
+              className="gst-btn gst-btn-gold"
+              style={{ width: "100%" }}
             >
               Entendi
             </button>
@@ -704,36 +655,3 @@ function badgeStyle(color: string, bg: string): React.CSSProperties {
   };
 }
 
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "9px 12px",
-  background: "#0B0B0B",
-  border: "1px solid #2A2620",
-  borderRadius: 8,
-  color: "#F4EEDF",
-  fontSize: 14,
-  outline: "none",
-  boxSizing: "border-box",
-};
-
-const primaryBtn: React.CSSProperties = {
-  padding: "8px 18px",
-  background: "linear-gradient(180deg,#E0BE5C,#C9A84C 48%,#8E6A24)",
-  color: "#1A1408",
-  fontWeight: 700,
-  fontSize: 13,
-  border: "none",
-  borderRadius: 999,
-  cursor: "pointer",
-  marginLeft: "auto",
-};
-
-const ghostBtn: React.CSSProperties = {
-  padding: "8px 14px",
-  background: "transparent",
-  border: "1px solid #2A2620",
-  borderRadius: 999,
-  color: "#C8C2B4",
-  fontSize: 13,
-  cursor: "pointer",
-};

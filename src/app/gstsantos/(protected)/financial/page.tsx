@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { Download } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -336,19 +337,9 @@ export default function FinancialPage() {
   ];
 
   return (
-    <div style={{ padding: "24px 20px", maxWidth: 1100, margin: "0 auto" }}>
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          gap: 12,
-          marginBottom: 16,
-        }}
-      >
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F4EEDF", margin: 0 }}>
-          Financeiro
-        </h1>
+    <div className="gst-page">
+      <div className="gst-head" style={{ marginBottom: 16 }}>
+        <h1 className="gst-title">Financeiro</h1>
 
         {tab === "overview" && (
           <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -356,14 +347,10 @@ export default function FinancialPage() {
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
+                className={`gst-tab${period === p ? " on" : ""}`}
                 style={{
-                  padding: "6px 14px",
                   borderRadius: 999,
-                  border: `1px solid ${period === p ? "#C9A84C" : "#2A2620"}`,
-                  background: period === p ? "rgba(201,168,76,0.12)" : "transparent",
-                  color: period === p ? "#C9A84C" : "#8A847A",
-                  fontSize: 13,
-                  cursor: "pointer",
+                  border: `1px solid ${period === p ? "rgba(201,168,76,0.5)" : "#2A2620"}`,
                 }}
               >
                 {p === "day" ? "Dia" : p === "week" ? "Semana" : "Mês"}
@@ -373,46 +360,20 @@ export default function FinancialPage() {
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              style={{
-                padding: "6px 12px",
-                background: "#131211",
-                border: "1px solid #2A2620",
-                borderRadius: 8,
-                color: "#F4EEDF",
-                fontSize: 13,
-              }}
+              className="gst-input"
+              style={{ fontSize: 13, padding: "6px 12px" }}
             />
           </div>
         )}
       </div>
 
       {/* Tabs */}
-      <div
-        style={{
-          display: "flex",
-          gap: 4,
-          marginBottom: 20,
-          background: "#131211",
-          border: "1px solid #2A2620",
-          borderRadius: 10,
-          padding: 4,
-          width: "fit-content",
-        }}
-      >
+      <div className="gst-tabs" style={{ marginBottom: 20 }}>
         {TABS.filter((t) => !t.ownerOnly || isOwner).map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            style={{
-              padding: "6px 16px",
-              borderRadius: 7,
-              border: "none",
-              background: tab === t.key ? "rgba(201,168,76,0.15)" : "transparent",
-              color: tab === t.key ? "#C9A84C" : "#8A847A",
-              fontWeight: tab === t.key ? 600 : 400,
-              fontSize: 13,
-              cursor: "pointer",
-            }}
+            className={`gst-tab${tab === t.key ? " on" : ""}`}
           >
             {t.label}
           </button>
@@ -420,7 +381,15 @@ export default function FinancialPage() {
       </div>
 
       {loading || !data ? (
-        <p style={{ color: "#8A847A" }}>Carregando...</p>
+        <div style={{ display: "grid", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+            <div className="gst-skel" style={{ height: 84 }} />
+            <div className="gst-skel" style={{ height: 84, opacity: 0.8 }} />
+            <div className="gst-skel" style={{ height: 84, opacity: 0.6 }} />
+            <div className="gst-skel" style={{ height: 84, opacity: 0.4 }} />
+          </div>
+          <div className="gst-skel" style={{ height: 260, opacity: 0.5 }} />
+        </div>
       ) : tab === "wallet" ? (
         insightsLoading ? (
           <p style={{ color: "#8A847A" }}>Carregando insights...</p>
@@ -1048,26 +1017,21 @@ function KpiCard({
   accent?: string;
 }) {
   return (
-    <div
-      style={{
-        background: "#131211",
-        border: "1px solid #2A2620",
-        borderRadius: 12,
-        padding: "16px 20px",
-      }}
-    >
-      <p
-        style={{
-          margin: "0 0 6px",
-          fontSize: 11,
-          color: "#8A847A",
-          textTransform: "uppercase",
-          letterSpacing: "0.15em",
-        }}
-      >
+    <div className="gst-kpi" style={{ padding: "16px 20px" }}>
+      <p className="k-label" style={{ margin: "0 0 6px" }}>
         {label}
       </p>
-      <p style={{ margin: 0, fontSize: 22, fontWeight: 700, color: accent }}>{value}</p>
+      <p
+        style={{
+          margin: 0,
+          fontSize: 23,
+          fontWeight: 700,
+          fontFamily: "'Playfair Display', serif",
+          color: accent,
+        }}
+      >
+        {value}
+      </p>
     </div>
   );
 }
@@ -1076,36 +1040,29 @@ function ExportButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      style={{
-        padding: "6px 14px",
-        background: "transparent",
-        border: "1px solid #2A2620",
-        borderRadius: 999,
-        color: "#C8C2B4",
-        fontSize: 12,
-        cursor: "pointer",
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-      }}
+      className="gst-btn gst-btn-ghost"
+      style={{ fontSize: 12, minHeight: 34, padding: "6px 14px" }}
       title="Baixar planilha CSV"
     >
-      <span>📥</span> Exportar CSV
+      <Download size={13} strokeWidth={2} /> Exportar CSV
     </button>
   );
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div
-      style={{
-        background: "#131211",
-        border: "1px solid #2A2620",
-        borderRadius: 12,
-        padding: "16px 20px",
-      }}
-    >
-      <p style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 600, color: "#C8C2B4" }}>
+    <div className="gst-card" style={{ padding: "16px 20px" }}>
+      <p
+        style={{
+          margin: "0 0 12px",
+          fontSize: 11,
+          fontWeight: 600,
+          color: "#C9A84C",
+          fontFamily: "'JetBrains Mono', monospace",
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+        }}
+      >
         {title}
       </p>
       {children}

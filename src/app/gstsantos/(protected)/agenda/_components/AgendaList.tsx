@@ -1,5 +1,7 @@
 "use client";
 
+import { Check, X, UserX, CalendarX2, StickyNote } from "lucide-react";
+
 import type { Appointment } from "../page";
 
 const STATUS_LABELS: Record<Appointment["status"], string> = {
@@ -36,29 +38,21 @@ interface Props {
 export function AgendaList({ appointments, onStatusChange }: Props) {
   if (appointments.length === 0) {
     return (
-      <div
-        style={{
-          textAlign: "center",
-          padding: "60px 20px",
-          color: "#8A847A",
-          border: "1px solid #2A2620",
-          borderRadius: 12,
-        }}
-      >
-        Nenhum agendamento neste dia.
+      <div className="empty">
+        <CalendarX2 className="ic" strokeWidth={1.4} />
+        <p style={{ margin: 0, fontSize: 14 }}>Nenhum agendamento neste dia.</p>
       </div>
     );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <div className="gst-stagger" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {appointments.map((apt) => (
         <div
           key={apt.id}
+          className="gst-card gst-card-hover"
           style={{
-            background: "#131211",
-            border: "1px solid #2A2620",
-            borderRadius: 12,
+            borderLeft: `3px solid ${STATUS_COLORS[apt.status]}55`,
             padding: "16px 20px",
             display: "flex",
             flexWrap: "wrap",
@@ -68,7 +62,14 @@ export function AgendaList({ appointments, onStatusChange }: Props) {
         >
           {/* Time */}
           <div style={{ minWidth: 80 }}>
-            <span style={{ color: "#C9A84C", fontWeight: 700, fontSize: 15 }}>
+            <span
+              style={{
+                color: "#C9A84C",
+                fontWeight: 700,
+                fontSize: 15,
+                fontFamily: "'JetBrains Mono', monospace",
+              }}
+            >
               {fmtTime(apt.startsAt)}
             </span>
             <span style={{ color: "#8A847A", fontSize: 12 }}>
@@ -99,13 +100,24 @@ export function AgendaList({ appointments, onStatusChange }: Props) {
                   WebkitBoxOrient: "vertical" as const,
                 }}
               >
-                📝 {apt.notes}
+                <StickyNote
+                  size={11}
+                  style={{ display: "inline", verticalAlign: "-1px", marginRight: 4 }}
+                />
+                {apt.notes}
               </p>
             )}
           </div>
 
           {/* Price */}
-          <span style={{ color: "#C9A84C", fontWeight: 600, fontSize: 14 }}>
+          <span
+            style={{
+              color: "#C9A84C",
+              fontWeight: 600,
+              fontSize: 14,
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+          >
             {fmtPrice(apt.priceAtBooking)}
           </span>
 
@@ -118,6 +130,7 @@ export function AgendaList({ appointments, onStatusChange }: Props) {
                 fontSize: 11,
                 fontWeight: 600,
                 background: STATUS_COLORS[apt.status] + "22",
+                border: `1px solid ${STATUS_COLORS[apt.status]}44`,
                 color: STATUS_COLORS[apt.status],
               }}
             >
@@ -128,44 +141,55 @@ export function AgendaList({ appointments, onStatusChange }: Props) {
               <>
                 <button
                   onClick={() => onStatusChange(apt.id, "COMPLETED")}
-                  style={btnStyle("#4CAF50")}
+                  className="agenda-act"
+                  style={actStyle("#4CAF50")}
                   title="Concluir"
+                  aria-label="Concluir atendimento"
                 >
-                  ✓
+                  <Check size={15} strokeWidth={2.4} />
                 </button>
                 <button
                   onClick={() => onStatusChange(apt.id, "NO_SHOW")}
-                  style={btnStyle("#8A847A")}
+                  className="agenda-act"
+                  style={actStyle("#8A847A")}
                   title="Não compareceu"
+                  aria-label="Marcar como não compareceu"
                 >
-                  ✗
+                  <UserX size={14} strokeWidth={2.2} />
                 </button>
                 <button
                   onClick={() => onStatusChange(apt.id, "CANCELED")}
-                  style={btnStyle("#E57373")}
+                  className="agenda-act"
+                  style={actStyle("#E57373")}
                   title="Cancelar"
+                  aria-label="Cancelar agendamento"
                 >
-                  ✕
+                  <X size={15} strokeWidth={2.4} />
                 </button>
               </>
             )}
           </div>
         </div>
       ))}
+
+      <style>{`
+        .agenda-act { transition: transform .15s cubic-bezier(.2,.7,.2,1), filter .2s; }
+        .agenda-act:hover { transform: scale(1.12); filter: brightness(1.25); }
+        .agenda-act:active { transform: scale(0.92); }
+      `}</style>
     </div>
   );
 }
 
-function btnStyle(color: string): React.CSSProperties {
+function actStyle(color: string): React.CSSProperties {
   return {
-    width: 28,
-    height: 28,
+    width: 34,
+    height: 34,
     borderRadius: "50%",
     border: `1px solid ${color}44`,
-    background: color + "22",
+    background: color + "1c",
     color,
     cursor: "pointer",
-    fontSize: 13,
     display: "grid",
     placeItems: "center",
   };

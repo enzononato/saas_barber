@@ -20,7 +20,6 @@ export default async function GstLayout({ children }: { children: React.ReactNod
       style={{
         display: "flex",
         minHeight: "100dvh",
-        background: "#0B0B0B",
         color: "#F4EEDF",
         fontFamily: "Inter, sans-serif",
       }}

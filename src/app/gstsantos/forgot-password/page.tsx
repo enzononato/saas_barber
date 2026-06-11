@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ArrowLeft, Check, Mail } from "lucide-react";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -33,56 +34,27 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100dvh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "#0B0B0B",
-        padding: "24px",
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 380,
-          background: "#131211",
-          border: "1px solid #2A2620",
-          borderRadius: 16,
-          overflow: "hidden",
-        }}
-      >
+    <div className="auth-wrap">
+      <div className="auth-aura" style={{ top: "-15%", left: "-10%" }} />
+      <div className="auth-aura" style={{ bottom: "-20%", right: "-12%", animationDelay: "-4s" }} />
+
+      <div className="auth-card">
         {/* Header */}
         <div
           style={{
-            padding: "32px 28px 24px",
-            borderBottom: "1px solid #2A2620",
+            padding: "36px 28px 26px",
+            borderBottom: "1px solid rgba(201,168,76,0.12)",
             textAlign: "center",
           }}
         >
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              border: "1px solid #C9A84C",
-              borderRadius: "50%",
-              display: "inline-grid",
-              placeItems: "center",
-              color: "#C9A84C",
-              fontSize: 22,
-              fontStyle: "italic",
-              fontFamily: "Georgia, serif",
-            }}
-          >
-            S
-          </div>
+          <div className="auth-mark">S</div>
           <h1
             style={{
-              fontFamily: "Georgia, serif",
-              fontSize: 22,
+              fontFamily: "'Playfair Display', serif",
+              fontSize: 24,
               color: "#F4EEDF",
-              margin: "12px 0 4px",
+              margin: "14px 0 4px",
+              letterSpacing: "-0.01em",
             }}
           >
             Santos Studios
@@ -90,9 +62,10 @@ export default function ForgotPasswordPage() {
           <p
             style={{
               color: "#8A847A",
-              fontSize: 11,
-              letterSpacing: "0.2em",
+              fontSize: 10.5,
+              letterSpacing: "0.24em",
               textTransform: "uppercase",
+              fontFamily: "'JetBrains Mono', monospace",
               margin: 0,
             }}
           >
@@ -103,130 +76,117 @@ export default function ForgotPasswordPage() {
         <div style={{ padding: "28px" }}>
           {sent ? (
             <>
-              <div
-                style={{
-                  textAlign: "center",
-                  padding: "12px 0 20px",
-                }}
-              >
+              <div style={{ textAlign: "center", padding: "12px 0 22px" }}>
                 <div
                   style={{
-                    width: 48,
-                    height: 48,
+                    width: 56,
+                    height: 56,
                     borderRadius: "50%",
-                    background: "#4CAF5022",
-                    border: "1px solid #4CAF5044",
+                    background: "rgba(111,191,143,0.1)",
+                    border: "1px solid rgba(111,191,143,0.4)",
                     display: "inline-grid",
                     placeItems: "center",
-                    fontSize: 22,
+                    color: "#6FBF8F",
                     marginBottom: 16,
+                    animation: "ringIn .5s cubic-bezier(.2,.7,.2,1)",
                   }}
                 >
-                  ✓
+                  <Check size={26} strokeWidth={2.2} />
                 </div>
-                <p style={{ color: "#F4EEDF", fontWeight: 600, margin: "0 0 8px" }}>
+                <p style={{ color: "#F4EEDF", fontWeight: 600, fontSize: 16, margin: "0 0 8px" }}>
                   E-mail enviado!
                 </p>
-                <p style={{ color: "#8A847A", fontSize: 13, margin: 0 }}>
+                <p style={{ color: "#8A847A", fontSize: 13.5, lineHeight: 1.55, margin: 0 }}>
                   Se este e-mail está cadastrado, você receberá um link para definir sua senha.
                 </p>
               </div>
               {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
               <Link
                 href={"/gstsantos/login" as any}
-                style={{
-                  display: "block",
-                  textAlign: "center",
-                  padding: "13px 24px",
-                  background: "linear-gradient(180deg,#E0BE5C,#C9A84C 48%,#8E6A24)",
-                  color: "#1A1408",
-                  fontWeight: 700,
-                  fontSize: 15,
-                  borderRadius: 999,
-                  textDecoration: "none",
-                }}
+                className="gst-btn gst-btn-gold"
+                style={{ width: "100%", minHeight: 48, fontSize: 14.5, textDecoration: "none" }}
               >
                 Voltar ao login
               </Link>
             </>
           ) : (
             <form onSubmit={handleSubmit}>
-              <p style={{ color: "#C8C2B4", fontSize: 13, margin: "0 0 20px" }}>
+              <p style={{ color: "#C8C2B4", fontSize: 13.5, lineHeight: 1.55, margin: "0 0 22px" }}>
                 Informe seu e-mail e enviaremos um link para você definir uma nova senha.
               </p>
 
-              <div style={{ marginBottom: 24 }}>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 12,
-                    color: "#8A847A",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.15em",
-                    marginBottom: 6,
-                  }}
-                >
+              <div style={{ marginBottom: 22 }}>
+                <label className="gst-label" htmlFor="fp-email">
                   E-mail
                 </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                  style={{
-                    width: "100%",
-                    padding: "10px 14px",
-                    background: "#0B0B0B",
-                    border: "1px solid #2A2620",
-                    borderRadius: 8,
-                    color: "#F4EEDF",
-                    fontSize: 14,
-                    outline: "none",
-                    boxSizing: "border-box",
-                  }}
-                />
+                <div style={{ position: "relative" }}>
+                  <Mail
+                    size={15}
+                    strokeWidth={1.8}
+                    style={{
+                      position: "absolute",
+                      left: 14,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      color: "#8A847A",
+                      pointerEvents: "none",
+                    }}
+                  />
+                  <input
+                    id="fp-email"
+                    className="gst-input"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                    placeholder="voce@email.com"
+                    style={{ width: "100%", paddingLeft: 40, minHeight: 46 }}
+                  />
+                </div>
               </div>
 
               {error && (
-                <p style={{ color: "#E57373", fontSize: 13, marginBottom: 16, textAlign: "center" }}>
+                <div className="err-banner" role="alert" style={{ textAlign: "center" }}>
                   {error}
-                </p>
+                </div>
               )}
 
               <button
                 type="submit"
                 disabled={loading}
-                style={{
-                  width: "100%",
-                  padding: "13px 24px",
-                  background: loading
-                    ? "#2A2620"
-                    : "linear-gradient(180deg,#E0BE5C,#C9A84C 48%,#8E6A24)",
-                  color: loading ? "#8A847A" : "#1A1408",
-                  fontWeight: 700,
-                  fontSize: 15,
-                  border: "none",
-                  borderRadius: 999,
-                  cursor: loading ? "not-allowed" : "pointer",
-                  marginBottom: 16,
-                }}
+                className="gst-btn gst-btn-gold"
+                style={{ width: "100%", minHeight: 48, fontSize: 14.5, marginBottom: 16 }}
               >
-                {loading ? "Enviando..." : "Enviar link"}
+                {loading ? (
+                  <>
+                    <span className="spin" />
+                    Enviando...
+                  </>
+                ) : (
+                  "Enviar link"
+                )}
               </button>
 
               {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
               <Link
                 href={"/gstsantos/login" as any}
                 style={{
-                  display: "block",
-                  textAlign: "center",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  width: "100%",
+                  justifyContent: "center",
                   color: "#8A847A",
                   fontSize: 13,
                   textDecoration: "none",
+                  transition: "color 0.2s",
                 }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#C9A84C")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "#8A847A")}
               >
-                ← Voltar ao login
+                <ArrowLeft size={14} />
+                Voltar ao login
               </Link>
             </form>
           )}

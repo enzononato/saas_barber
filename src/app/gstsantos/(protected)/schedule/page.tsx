@@ -211,10 +211,10 @@ export default function SchedulePage() {
     : "Minha Agenda";
 
   return (
-    <div style={{ padding: "24px 20px", maxWidth: 700, margin: "0 auto" }}>
-      <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F4EEDF", margin: "0 0 20px" }}>
-        {pageTitle}
-      </h1>
+    <div className="gst-page" style={{ maxWidth: 700 }}>
+      <div className="gst-head" style={{ marginBottom: 20 }}>
+        <h1 className="gst-title">{pageTitle}</h1>
+      </div>
 
       {/* Barber selector — owner only */}
       {isOwner && barbers.length > 0 && (
@@ -241,20 +241,24 @@ export default function SchedulePage() {
       )}
 
       {!me || (loading && Object.keys(hours).length === 0) ? (
-        <p style={{ color: "#8A847A" }}>Carregando...</p>
+        <div style={{ display: "grid", gap: 12 }}>
+          <div className="gst-skel" style={{ height: 320 }} />
+          <div className="gst-skel" style={{ height: 140, opacity: 0.6 }} />
+        </div>
       ) : (
         <>
           {/* Working hours */}
-          <section
-            style={{
-              background: "#131211",
-              border: "1px solid #2A2620",
-              borderRadius: 12,
-              padding: "20px",
-              marginBottom: 24,
-            }}
-          >
-            <h2 style={{ margin: "0 0 16px", fontSize: 15, color: "#C8C2B4" }}>
+          <section className="gst-card" style={{ padding: 20, marginBottom: 24 }}>
+            <h2
+              style={{
+                margin: "0 0 16px",
+                fontSize: 11,
+                color: "#C9A84C",
+                fontFamily: "'JetBrains Mono', monospace",
+                letterSpacing: "0.18em",
+                textTransform: "uppercase",
+              }}
+            >
               Horários de trabalho
             </h2>
 
@@ -372,22 +376,16 @@ export default function SchedulePage() {
             <button
               onClick={() => void saveHours()}
               disabled={saving || loading}
-              style={{ ...primaryBtn, marginTop: 20, marginLeft: 0 }}
+              className="gst-btn gst-btn-gold"
+              style={{ marginTop: 20 }}
             >
               {saving ? "Salvando..." : "Salvar horários"}
             </button>
           </section>
 
           {/* Time exceptions */}
-          <section
-            style={{
-              background: "#131211",
-              border: "1px solid #2A2620",
-              borderRadius: 12,
-              padding: "20px",
-            }}
-          >
-            <h2 style={{ margin: "0 0 16px", fontSize: 15, color: "#C8C2B4" }}>
+          <section className="gst-card" style={{ padding: 20 }}>
+            <h2 style={{ margin: "0 0 16px", fontSize: 11, color: "#C9A84C", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.18em", textTransform: "uppercase" }}>
               Exceções / Folgas
             </h2>
 
@@ -436,7 +434,7 @@ export default function SchedulePage() {
                 <button
                   onClick={() => void addException()}
                   disabled={addingEx || !exForm.startsAt || !exForm.endsAt}
-                  style={primaryBtn}
+                  className="gst-btn gst-btn-gold"
                 >
                   {addingEx ? "..." : "Adicionar"}
                 </button>
@@ -567,18 +565,6 @@ const timeInput: React.CSSProperties = {
   outline: "none",
 };
 
-const primaryBtn: React.CSSProperties = {
-  padding: "8px 18px",
-  background: "linear-gradient(180deg,#E0BE5C,#C9A84C 48%,#8E6A24)",
-  color: "#1A1408",
-  fontWeight: 700,
-  fontSize: 13,
-  border: "none",
-  borderRadius: 999,
-  cursor: "pointer",
-  marginLeft: "auto",
-  flexShrink: 0,
-};
 
 const labelStyle: React.CSSProperties = {
   display: "block",

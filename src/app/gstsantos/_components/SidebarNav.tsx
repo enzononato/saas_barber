@@ -61,121 +61,53 @@ export function SidebarNav({ role, canManageBarbers, isBarber }: Props) {
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
-  const linkStyle = (href: string): React.CSSProperties => ({
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    padding: "10px 16px",
-    borderRadius: 8,
-    textDecoration: "none",
-    fontSize: 14,
-    fontWeight: isActive(href) ? 600 : 400,
-    color: isActive(href) ? "#C9A84C" : "#C8C2B4",
-    background: isActive(href) ? "rgba(201,168,76,0.08)" : "transparent",
-    transition: "all 0.15s",
-    cursor: "pointer",
-  });
-
   return (
     <>
       {/* Desktop sidebar */}
-      <aside
-        style={{
-          width: 220,
-          borderRight: "1px solid #2A2620",
-          display: "flex",
-          flexDirection: "column",
-          padding: "24px 12px",
-          position: "sticky",
-          top: 0,
-          height: "100dvh",
-        }}
-        className="gst-sidebar"
-      >
+      <aside className="gst-sidebar">
         {/* Logo */}
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              border: "1px solid #C9A84C",
-              borderRadius: "50%",
-              display: "inline-grid",
-              placeItems: "center",
-              color: "#C9A84C",
-              fontSize: 18,
-              fontStyle: "italic",
-              fontFamily: "Georgia, serif",
-            }}
-          >
-            S
-          </div>
+        <div style={{ textAlign: "center", marginBottom: 30 }}>
+          <div className="gst-side-mark">S</div>
           <p
             style={{
               color: "#8A847A",
-              fontSize: 10,
-              letterSpacing: "0.2em",
+              fontSize: 9.5,
+              letterSpacing: "0.24em",
               textTransform: "uppercase",
-              margin: "8px 0 0",
+              fontFamily: "'JetBrains Mono', monospace",
+              margin: "10px 0 0",
             }}
           >
             Santos Studios
           </p>
         </div>
 
-        <nav style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+        <nav style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
           {items.map((item) => {
             const Icon = item.icon;
+            const active = isActive(item.href);
             return (
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              <Link key={item.href} href={item.href as any} style={linkStyle(item.href)}>
-                <Icon size={17} strokeWidth={isActive(item.href) ? 2.2 : 1.7} />
+              <Link
+                key={item.href}
+                href={item.href as any}
+                className={`gst-side-link${active ? " on" : ""}`}
+              >
+                <Icon size={17} strokeWidth={active ? 2.2 : 1.7} />
                 {item.label}
               </Link>
             );
           })}
         </nav>
 
-        <button
-          onClick={handleLogout}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            padding: "10px 16px",
-            borderRadius: 8,
-            border: "none",
-            background: "transparent",
-            color: "#8A847A",
-            fontSize: 14,
-            cursor: "pointer",
-            width: "100%",
-            textAlign: "left",
-          }}
-        >
+        <button onClick={handleLogout} className="gst-side-link gst-side-logout">
           <LogOut size={17} strokeWidth={1.7} />
           Sair
         </button>
       </aside>
 
       {/* Mobile bottom nav */}
-      <nav
-        style={{
-          position: "fixed",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          background: "rgba(19,18,17,0.92)",
-          backdropFilter: "blur(16px) saturate(1.3)",
-          WebkitBackdropFilter: "blur(16px) saturate(1.3)",
-          borderTop: "1px solid #2A2620",
-          display: "flex",
-          justifyContent: "space-around",
-          padding: "6px 0 calc(6px + env(safe-area-inset-bottom))",
-          zIndex: 50,
-        }}
-        className="gst-bottom-nav"
-      >
+      <nav className="gst-bottom-nav">
         {items.slice(0, 5).map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
@@ -184,22 +116,7 @@ export function SidebarNav({ role, canManageBarbers, isBarber }: Props) {
             <Link
               key={item.href}
               href={item.href as any}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 3,
-                minWidth: 52,
-                minHeight: 48,
-                padding: "4px 8px",
-                borderRadius: 10,
-                color: active ? "#C9A84C" : "#8A847A",
-                background: active ? "rgba(201,168,76,0.08)" : "transparent",
-                textDecoration: "none",
-                fontSize: 10,
-                transition: "all 0.15s",
-              }}
+              className={`gst-bnav-link${active ? " on" : ""}`}
             >
               <Icon size={20} strokeWidth={active ? 2.2 : 1.7} />
               {item.label}
@@ -209,11 +126,123 @@ export function SidebarNav({ role, canManageBarbers, isBarber }: Props) {
       </nav>
 
       <style>{`
+        .gst-sidebar {
+          width: 224px;
+          flex-shrink: 0;
+          display: flex;
+          flex-direction: column;
+          padding: 26px 12px 18px;
+          position: sticky;
+          top: 0;
+          height: 100dvh;
+          border-right: 1px solid rgba(201,168,76,0.1);
+          background: linear-gradient(180deg, rgba(244,238,223,0.025), rgba(244,238,223,0.004) 30%);
+          backdrop-filter: blur(14px);
+          -webkit-backdrop-filter: blur(14px);
+        }
+        .gst-side-mark {
+          width: 44px;
+          height: 44px;
+          border: 1px solid #C9A84C;
+          border-radius: 50%;
+          display: inline-grid;
+          place-items: center;
+          color: #C9A84C;
+          font-size: 19px;
+          font-style: italic;
+          font-family: 'Playfair Display', Georgia, serif;
+          box-shadow: 0 0 24px -8px rgba(201,168,76,0.5), inset 0 0 0 1px rgba(255,255,255,0.04);
+        }
+        .gst-side-link {
+          position: relative;
+          display: flex;
+          align-items: center;
+          gap: 11px;
+          padding: 11px 14px;
+          border-radius: 10px;
+          text-decoration: none;
+          font-size: 14px;
+          font-weight: 400;
+          color: #C8C2B4;
+          background: transparent;
+          border: none;
+          width: 100%;
+          text-align: left;
+          cursor: pointer;
+          font-family: inherit;
+          transition: color .2s cubic-bezier(.2,.7,.2,1), background .2s cubic-bezier(.2,.7,.2,1), transform .2s cubic-bezier(.2,.7,.2,1);
+        }
+        .gst-side-link:hover:not(.on) {
+          color: #F4EEDF;
+          background: rgba(244,238,223,0.04);
+          transform: translateX(2px);
+        }
+        .gst-side-link.on {
+          color: #C9A84C;
+          font-weight: 600;
+          background: linear-gradient(90deg, rgba(201,168,76,0.13), rgba(201,168,76,0.04));
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+        }
+        .gst-side-link.on::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          top: 22%;
+          bottom: 22%;
+          width: 3px;
+          border-radius: 999px;
+          background: linear-gradient(180deg, #E8C870, #C9A84C);
+          box-shadow: 0 0 10px rgba(201,168,76,0.6);
+          animation: gstPillIn .25s cubic-bezier(.2,.7,.2,1);
+        }
+        @keyframes gstPillIn { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+        .gst-side-logout { color: #8A847A; margin-top: 8px; }
+        .gst-side-logout:hover { color: #E76A5A !important; background: rgba(231,106,90,0.06) !important; }
+
+        .gst-bottom-nav {
+          position: fixed;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          background: linear-gradient(180deg, rgba(19,18,17,0.82), rgba(11,11,11,0.96));
+          backdrop-filter: blur(18px) saturate(1.35);
+          -webkit-backdrop-filter: blur(18px) saturate(1.35);
+          border-top: 1px solid rgba(201,168,76,0.14);
+          display: flex;
+          justify-content: space-around;
+          padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
+          z-index: 50;
+        }
+        .gst-bnav-link {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 3px;
+          min-width: 56px;
+          min-height: 48px;
+          padding: 5px 8px;
+          border-radius: 12px;
+          color: #8A847A;
+          text-decoration: none;
+          font-size: 10px;
+          transition: color .2s, background .2s, transform .15s;
+        }
+        .gst-bnav-link:active { transform: scale(0.92); }
+        .gst-bnav-link.on {
+          color: #C9A84C;
+          background: linear-gradient(180deg, rgba(201,168,76,0.14), rgba(201,168,76,0.05));
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+        }
         @media (min-width: 768px) {
           .gst-bottom-nav { display: none !important; }
         }
         @media (max-width: 767px) {
           .gst-sidebar { display: none !important; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .gst-side-link, .gst-bnav-link { transition: none; }
+          .gst-side-link.on::before { animation: none; }
         }
       `}</style>
     </>
