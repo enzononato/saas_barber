@@ -22,6 +22,7 @@
     "@serwist/next": "^9.5.11",
     "better-auth": "^1.2.0",
     "drizzle-orm": "^0.45.2",
+    "lucide-react": "^1.17.0",
     "next": "^15.0.0",
     "pg": "^8.13.0",
     "react": "^19.0.0",

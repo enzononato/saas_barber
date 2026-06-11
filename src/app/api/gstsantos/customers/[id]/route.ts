@@ -27,8 +27,9 @@ export async function GET(
   const customer = await getCustomerById(ctx.orgId, id);
   if (!customer) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-  // Scope: barbeiro só vê clientes com quem ele teve appointments
-  if (ctx.role !== "owner") {
+  // Scope: barbeiro só vê clientes com quem ele teve appointments.
+  // Owner e recepcionista veem todos.
+  if (ctx.role === "member") {
     const [hasAccess] = await db
       .select({ ok: sql<number>`1` })
       .from(appointments)
@@ -43,11 +44,11 @@ export async function GET(
     if (!hasAccess) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  const scopeUserId = ctx.role === "owner" ? undefined : ctx.userId;
+  const scopeUserId = ctx.role === "member" ? ctx.userId : undefined;
   const analytics = await getCustomerAnalytics(ctx.orgId, customer.phone, scopeUserId);
 
-  // Owner pode ver notas privadas, barbeiro não
-  const notes = ctx.role === "owner" ? customer.notes : null;
+  // Owner e recepcionista podem ver notas privadas; barbeiro não
+  const notes = ctx.role === "member" ? null : customer.notes;
 
   void exists; // suprime warning
 
@@ -72,7 +73,10 @@ export async function PATCH(
 ) {
   const ctx = await requireAuth();
   if (!ctx) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  if (ctx.role !== "owner") return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  // Owner edita tudo; recepcionista edita nome/notas/tags (não pode bloquear)
+  if (ctx.role === "member") {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
 
   const { id } = await params;
 
@@ -92,6 +96,10 @@ export async function PATCH(
   }
 
   const data = parsed.data;
+
+  if (data.isBlocked !== undefined && ctx.role !== "owner") {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
 
   const [updated] = await db
     .update(customers)

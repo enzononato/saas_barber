@@ -2,10 +2,13 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
 import { AgendaList } from "./_components/AgendaList";
 import { AgendaTimeline } from "./_components/AgendaTimeline";
 import { AgendaWeek } from "./_components/AgendaWeek";
 import { AgendaKanban } from "./_components/AgendaKanban";
+import { CheckoutModal, type CheckoutPayload } from "./_components/CheckoutModal";
+import { NewAppointmentModal } from "./_components/NewAppointmentModal";
 
 export type Appointment = {
   id: string;
@@ -19,6 +22,8 @@ export type Appointment = {
   status: "SCHEDULED" | "COMPLETED" | "CANCELED" | "NO_SHOW";
   priceAtBooking: string;
   notes: string | null;
+  paymentMethod?: string | null;
+  tipAmount?: string | null;
 };
 
 type View = "list" | "timeline" | "week" | "kanban";
@@ -34,6 +39,12 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+type Me = {
+  id: string;
+  role: "owner" | "member" | "receptionist";
+  canCreateServices: boolean;
+};
+
 export default function AgendaPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -44,11 +55,21 @@ export default function AgendaPage() {
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [me, setMe] = useState<Me | null>(null);
+  const [newOpen, setNewOpen] = useState(false);
+  const [checkoutFor, setCheckoutFor] = useState<Appointment | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setSearchQuery(searchInput.trim()), 300);
     return () => clearTimeout(t);
   }, [searchInput]);
+
+  useEffect(() => {
+    void (async () => {
+      const res = await fetch("/api/gstsantos/me");
+      if (res.ok) setMe(await res.json());
+    })();
+  }, []);
 
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
@@ -84,14 +105,37 @@ export default function AgendaPage() {
     router.replace(`/gstsantos/agenda?${params.toString()}` as any);
   }
 
-  async function updateStatus(id: string, status: string): Promise<boolean> {
+  async function patchStatus(id: string, body: Record<string, unknown>): Promise<boolean> {
     const res = await fetch(`/api/gstsantos/appointments/${id}/status`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify(body),
     });
     await fetchAppointments();
     return res.ok;
+  }
+
+  async function updateStatus(id: string, status: string): Promise<boolean> {
+    // Concluir abre o modal de fechamento (POS) em vez de completar direto
+    if (status === "COMPLETED") {
+      const apt = appointments.find((a) => a.id === id);
+      if (apt) {
+        setCheckoutFor(apt);
+        return false; // Kanban faz rollback visual; o card move após o fechamento
+      }
+    }
+    return patchStatus(id, { status });
+  }
+
+  async function handleCheckout(payload: CheckoutPayload) {
+    if (!checkoutFor) return;
+    const ok = await patchStatus(checkoutFor.id, {
+      status: "COMPLETED",
+      paymentMethod: payload.paymentMethod,
+      tipAmount: payload.tipAmount,
+      products: payload.products,
+    });
+    if (ok) setCheckoutFor(null);
   }
 
   return (
@@ -109,13 +153,35 @@ export default function AgendaPage() {
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F4EEDF", margin: 0 }}>
           Agenda
         </h1>
+        <button
+          onClick={() => setNewOpen(true)}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 7,
+            padding: "9px 18px",
+            minHeight: 38,
+            background: "linear-gradient(180deg,#E0BE5C,#C9A84C 48%,#8E6A24)",
+            color: "#1A1408",
+            fontWeight: 700,
+            fontSize: 13,
+            border: "none",
+            borderRadius: 999,
+            cursor: "pointer",
+            transition: "transform 0.15s, box-shadow 0.15s",
+            boxShadow: "0 8px 20px -8px rgba(201,168,76,0.5)",
+          }}
+        >
+          <Plus size={15} strokeWidth={2.5} />
+          Novo agendamento
+        </button>
         <input
           type="search"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           placeholder="Buscar cliente..."
           style={{
-            padding: "6px 12px",
+            padding: "8px 12px",
             background: "#131211",
             border: "1px solid #2A2620",
             borderRadius: 8,
@@ -131,7 +197,7 @@ export default function AgendaPage() {
           value={date}
           onChange={(e) => setDate(e.target.value)}
           style={{
-            padding: "6px 12px",
+            padding: "8px 12px",
             background: "#131211",
             border: "1px solid #2A2620",
             borderRadius: 8,
@@ -159,7 +225,8 @@ export default function AgendaPage() {
             key={v.key}
             onClick={() => setView(v.key)}
             style={{
-              padding: "6px 16px",
+              padding: "7px 16px",
+              minHeight: 34,
               borderRadius: 7,
               border: "none",
               background: view === v.key ? "rgba(201,168,76,0.15)" : "transparent",
@@ -167,6 +234,7 @@ export default function AgendaPage() {
               fontWeight: view === v.key ? 600 : 400,
               fontSize: 13,
               cursor: "pointer",
+              transition: "all 0.15s",
             }}
           >
             {v.label}
@@ -195,6 +263,30 @@ export default function AgendaPage() {
             <AgendaKanban appointments={filteredAppointments} onStatusChange={updateStatus} />
           )}
         </>
+      )}
+
+      {/* Modal de fechamento (POS) */}
+      {checkoutFor && (
+        <CheckoutModal
+          appointment={checkoutFor}
+          onConfirm={handleCheckout}
+          onClose={() => setCheckoutFor(null)}
+        />
+      )}
+
+      {/* Modal de novo agendamento */}
+      {newOpen && (
+        <NewAppointmentModal
+          defaultDate={date}
+          lockedProfessionalId={
+            me && me.role === "member" && !me.canCreateServices ? me.id : undefined
+          }
+          onCreated={() => {
+            setNewOpen(false);
+            void fetchAppointments();
+          }}
+          onClose={() => setNewOpen(false)}
+        />
       )}
     </div>
   );

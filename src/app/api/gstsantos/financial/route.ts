@@ -5,6 +5,7 @@ import { db } from "@/server/db";
 import { appointments } from "@/server/db/schema/appointments";
 import { user } from "@/server/db/schema/auth";
 import { expenses } from "@/server/db/schema/expenses";
+import { appointmentProducts } from "@/server/db/schema/products";
 import { requireAuth } from "@/server/middleware/requireAuth";
 
 function getPeriodRange(period: string, date: string): { start: Date; end: Date } {
@@ -92,6 +93,30 @@ export async function GET(req: Request) {
     .groupBy(appointments.serviceNameAtBooking)
     .orderBy(sql`SUM(${appointments.priceAtBooking}) DESC`);
 
+  // Fechamento de caixa: receita por forma de pagamento + gorjetas.
+  // Disponível para todos os papéis (barbeiro já vem escopado pelas conditions).
+  const byPaymentMethod = await db
+    .select({
+      method: appointments.paymentMethod,
+      revenue: sql<string>`SUM(${appointments.priceAtBooking})`,
+      tips: sql<string>`COALESCE(SUM(${appointments.tipAmount}), 0)`,
+      count: sql<number>`COUNT(*)::int`,
+    })
+    .from(appointments)
+    .where(and(...conditions))
+    .groupBy(appointments.paymentMethod)
+    .orderBy(sql`SUM(${appointments.priceAtBooking}) DESC`);
+
+  // Vendas de produtos no período (vinculadas a atendimentos do escopo)
+  const [productTotals] = await db
+    .select({
+      revenue: sql<string>`COALESCE(SUM(${appointmentProducts.priceAtSale} * ${appointmentProducts.quantity}), 0)`,
+      itemsSold: sql<number>`COALESCE(SUM(${appointmentProducts.quantity}), 0)::int`,
+    })
+    .from(appointmentProducts)
+    .innerJoin(appointments, eq(appointmentProducts.appointmentId, appointments.id))
+    .where(and(...conditions));
+
   // By barber — owner only
   let byBarber = null;
   if (ctx.role === "owner") {
@@ -176,9 +201,13 @@ export async function GET(req: Request) {
     daily,
     byService,
     byBarber,
+    byPaymentMethod,
+    productRevenue: productTotals?.revenue ?? "0",
+    productItemsSold: productTotals?.itemsSold ?? 0,
     totalExpenses,
     profit,
     expensesByCategory,
     expensesList,
+    role: ctx.role,
   });
 }

@@ -5,7 +5,11 @@ import { organization } from "better-auth/plugins";
 import { db } from "@/server/db";
 import * as authSchema from "@/server/db/schema/auth";
 import { env } from "@/lib/env";
-import { sendPasswordResetEmail } from "@/lib/email";
+import {
+  consumeInviteFlag,
+  sendBarberInviteEmail,
+  sendPasswordResetEmail,
+} from "@/lib/email";
 
 export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
@@ -25,11 +29,21 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     sendResetPassword: async ({ user, url }) => {
-      await sendPasswordResetEmail({
-        name: user.name,
-        email: user.email,
-        resetUrl: url,
-      });
+      // Convite de novo profissional → e-mail de boas-vindas;
+      // fluxo normal de "esqueci minha senha" → e-mail de redefinição.
+      if (consumeInviteFlag(user.email)) {
+        await sendBarberInviteEmail({
+          name: user.name,
+          email: user.email,
+          setupUrl: url,
+        });
+      } else {
+        await sendPasswordResetEmail({
+          name: user.name,
+          email: user.email,
+          resetUrl: url,
+        });
+      }
     },
   },
   plugins: [

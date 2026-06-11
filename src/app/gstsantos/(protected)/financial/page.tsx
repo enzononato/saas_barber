@@ -77,6 +77,13 @@ interface BarberOption {
   name: string;
 }
 
+interface PaymentMethodEntry {
+  method: string | null;
+  revenue: string;
+  tips: string;
+  count: number;
+}
+
 interface FinancialData {
   period: string;
   date: string;
@@ -85,11 +92,22 @@ interface FinancialData {
   daily: DayEntry[];
   byService: ServiceEntry[];
   byBarber: BarberEntry[] | null;
+  byPaymentMethod: PaymentMethodEntry[];
+  productRevenue: string;
+  productItemsSold: number;
   totalExpenses: string;
   profit: string;
   expensesByCategory: CategoryEntry[];
   expensesList: ExpenseEntry[];
+  role?: "owner" | "member" | "receptionist";
 }
+
+const PAYMENT_LABELS: Record<string, string> = {
+  CASH: "Dinheiro",
+  PIX: "PIX",
+  CREDIT_CARD: "Cartão de crédito",
+  DEBIT_CARD: "Cartão de débito",
+};
 
 const COLORS = ["#C9A84C", "#8E6A24", "#E0BE5C", "#6B4F1A", "#F4EEDF"];
 
@@ -490,8 +508,86 @@ export default function FinancialPage() {
             )}
           </div>
 
+          {/* Fechamento de caixa — receita por forma de pagamento */}
+          {data.byPaymentMethod && data.byPaymentMethod.length > 0 && (
+            <Section title="Fechamento de caixa">
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {data.byPaymentMethod.map((pm) => {
+                  const total = parseFloat(data.total) || 1;
+                  const pct = Math.round((parseFloat(pm.revenue) / total) * 100);
+                  return (
+                    <div
+                      key={pm.method ?? "none"}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "10px 14px",
+                        background: "#0B0B0B",
+                        border: "1px solid #2A2620",
+                        borderRadius: 10,
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: 0, fontSize: 13, color: "#F4EEDF", fontWeight: 600 }}>
+                          {pm.method ? PAYMENT_LABELS[pm.method] ?? pm.method : "Sem forma registrada"}
+                        </p>
+                        <div
+                          style={{
+                            marginTop: 6,
+                            height: 4,
+                            borderRadius: 999,
+                            background: "#1B1916",
+                            overflow: "hidden",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: `${pct}%`,
+                              height: "100%",
+                              borderRadius: 999,
+                              background: "linear-gradient(90deg,#E0BE5C,#C9A84C)",
+                              transition: "width 0.6s cubic-bezier(.2,.7,.2,1)",
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <p style={{ margin: 0, color: "#C9A84C", fontWeight: 700, fontSize: 14 }}>
+                          {fmtR$(pm.revenue)}
+                        </p>
+                        <p style={{ margin: 0, color: "#8A847A", fontSize: 11 }}>
+                          {pm.count} atend.
+                          {parseFloat(pm.tips) > 0 && ` · ${fmtR$(pm.tips)} gorjeta`}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+                {parseFloat(data.productRevenue) > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      padding: "10px 14px",
+                      borderTop: "1px dashed #2A2620",
+                      marginTop: 4,
+                    }}
+                  >
+                    <span style={{ color: "#8A847A", fontSize: 13 }}>
+                      Produtos vendidos ({data.productItemsSold} un.)
+                    </span>
+                    <span style={{ color: "#C9A84C", fontWeight: 700, fontSize: 14 }}>
+                      {fmtR$(data.productRevenue)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </Section>
+          )}
+
           {data.daily.length > 0 && (
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12, marginTop: 20 }}>
               <ExportButton onClick={exportOverviewCsv} />
             </div>
           )}

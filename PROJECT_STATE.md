@@ -2,7 +2,7 @@
 > **Leia este arquivo antes de qualquer ação.** Ele é a fonte da verdade sobre o estado atual do projeto.
 > Para requisitos completos de produto e schema, leia `CONTEXT.md`.
 
-**Última atualização:** 2026-05-27 — Módulo BI completo (3 fases): Insights/Carteira + Lucratividade/Comissões + Simulação/Alertas/CSV
+**Última atualização:** 2026-06-10 — FASE 10: Recepcionista (RBAC) + POS/Caixa + Produtos + Multi-serviços + Auto-gestão do cliente + Lembretes WhatsApp + Design premium mobile-first
 **Atualize este arquivo ao concluir cada fase.**
 
 ---
@@ -375,6 +375,82 @@ Módulo robusto de Business Intelligence dentro do `/gstsantos/financial`, organ
 - **Aplicar migrations 0008 + 0009 em produção:** Roda automaticamente em `npm run db:migrate` na primeira inicialização (todas idempotentes — `IF NOT EXISTS`)
 - **Configurar comissões iniciais:** owner → /gstsantos/barbers → botão "Comissões" em cada barbeiro → ajustar % por serviço (default 0%)
 - **Marcar despesas existentes:** opcionalmente editar despesas para definir `is_recurring=true` (aluguel, salários) ou `attributed_to_user_id` (custos por barbeiro específico)
+
+### FASE 10 — Recepcionista + POS + Produtos + Multi-serviços + Auto-gestão + Lembretes + Design Premium · `✅ CONCLUÍDA`
+**Responsável:** Claude (Fable)
+
+**Migration `0010_pos_products_multiservice_reminders.sql`** (idempotente):
+- [x] `appointments` ganha: `payment_method` (CHECK CASH/PIX/CREDIT_CARD/DEBIT_CARD), `tip_amount` (default 0), `completed_at`, `reminder_sent_at`
+- [x] Nova tabela `appointment_services` — detalhamento multi-serviço (snapshot nome/preço/duração + position)
+- [x] Novas tabelas `products` (name, price, cost_price, stock_quantity, is_active) e `appointment_products` (vendas no checkout com snapshot)
+- [x] `whatsapp_settings` ganha: `reminder_enabled` (default true), `reminder_hours_before` (default 2), `reminder_template`
+- [x] Índice parcial `appointments_reminder_scan_idx` para a varredura do cron
+
+**1. RBAC — Papel `receptionist`:**
+- [x] `requireAuth.ts`: `MemberRole = "owner" | "member" | "receptionist"` + flag `canManageAllAppointments`
+- [x] Recepcionista vê/gerencia agenda de TODOS (appointments GET/status já escopavam só `member`)
+- [x] Clientes: vê todos, edita nome/notas/tags; NÃO pode bloquear (`isBlocked` → owner only)
+- [x] Financeiro: vê faturamento + fechamento de caixa por forma de pagamento; BI (insights/byBarber/despesas) continua owner-only
+- [x] NÃO acessa: barbers (criar/remover), comissões, serviços, WhatsApp, produtos (gestão)
+- [x] Criada sempre com `isBarber=false` — nunca aparece no booking público
+- [x] `barbers/page.tsx`: 3 perfis no modal de criação (Barbeiro / Recepcionista / Barbeiro Dono), badge azul "Recepcionista", toggles ocultos para recepcionista
+- [x] SidebarNav: nav da recepcionista = Agenda, Clientes, Financeiro (sem Serviços/Minha Agenda)
+
+**2. Fluxo de convite refinado:**
+- [x] `email.ts`: `markInviteEmail()` / `consumeInviteFlag()` (Map em memória, TTL 5min)
+- [x] `auth.ts` `sendResetPassword`: convite → `sendBarberInviteEmail` (boas-vindas); esqueci-senha → template genérico
+- [x] `barbers` POST marca o convite antes do `requestPasswordReset`; **não retorna mais `tempPassword`**
+- [x] Modal pós-criação agora é "Convite enviado!" (sem credenciais expostas)
+- [x] `reset-password/page.tsx` **reescrita premium**: card liquid glass com aura dourada animada, medidor de força de senha (5 níveis), toggle mostrar/ocultar, check animado de confirmação, animações de entrada (respeitando `prefers-reduced-motion`)
+
+**3. Agendamento manual pelo painel:**
+- [x] `GET /api/gstsantos/availability` — slots internos (`professionalId`+`serviceIds`+`date`); barbeiro comum só consulta a si
+- [x] `POST /api/gstsantos/appointments` — cria com upsert de customer, validação de disponibilidade, multi-serviços; owner/recepcionista/barbeiro-admin agendam para qualquer um
+- [x] `NewAppointmentModal.tsx` — botão "Novo agendamento" na agenda: busca de cliente existente (debounce + sugestões), pills de profissional, multi-select de serviços com total, slots em grid, bottom-sheet mobile
+
+**4. POS / Fechamento de caixa:**
+- [x] `status` PATCH estendido: ao COMPLETED aceita `paymentMethod` + `tipAmount` + `products[]`; grava `completed_at`, insere `appointment_products` (snapshot) e dá baixa no estoque (sem negativar)
+- [x] `CheckoutModal.tsx` — intercepta "Concluir" em Lista e Kanban: 4 formas de pagamento com ícones, gorjeta com atalhos (5/10/20), carrinho de produtos com +/-, resumo com total
+- [x] `financial` GET ganha `byPaymentMethod` (receita+gorjetas+contagem por método) e `productRevenue`/`productItemsSold`
+- [x] Visão Geral do financeiro: seção "Fechamento de caixa" com barras proporcionais por método + linha de produtos vendidos
+
+**5. Venda de produtos físicos:**
+- [x] APIs: `GET/POST /api/gstsantos/products` + `PATCH/DELETE /[id]` (owner gerencia; qualquer membro lista ativos p/ checkout; delete com vendas → desativa)
+- [x] Página `/gstsantos/products`: cards com margem calculada, badge de estoque, ativar/desativar, modal criar/editar
+- [x] SidebarNav: item "Produtos" (owner only)
+
+**6. Cancelamento/Reagendamento autônomo pelo cliente:**
+- [x] `src/lib/booking-rules.ts` — `SELF_SERVICE_MIN_HOURS = 2` + `canSelfManage()`
+- [x] APIs públicas: `GET /api/[slug]/appointments/[id]` (UUID = token de acesso), `POST /cancel`, `POST /reschedule` (mesmo profissional/duração, trata 23P01 → 409, zera `reminder_sent_at`), `GET /slots?date=` (exclui o próprio agendamento via `excludeAppointmentId` novo em `availability.ts`)
+- [x] Página `/[slug]/agendamentos/[id]/gerenciar` — liquid glass: status badge, detalhes, remarcar (date-rail 14 dias + slots), cancelar com confirmação inline, telas de sucesso animadas
+- [x] Link de gerenciamento: anexado à mensagem de confirmação WhatsApp + exibido na tela de sucesso do wizard + retornado pela API de booking (`manageUrl`)
+
+**7. Múltiplos serviços (combos):**
+- [x] Validadores aceitam `serviceIds` (1-5) mantendo compat com `serviceId`
+- [x] `/api/[slug]/availability` soma duração de todos os serviços
+- [x] Booking público e manual: preço total, duração total, nome concatenado ("Corte + Barba"), itens gravados em `appointment_services`
+- [x] Wizard passo 1 virou multi-select com barra flutuante de total (`.wz-combo-bar` glass)
+
+**8. Lembrete automático pré-agendamento (WhatsApp):**
+- [x] `triggerRemindersForOrg()` em `whatsapp.ts` — busca SCHEDULED na janela `reminder_hours_before`, dedup via `reminder_sent_at`, pausas aleatórias anti-rajada
+- [x] `POST /api/gstsantos/whatsapp/trigger-reminders` — dual auth (Bearer CRON_SECRET ou sessão owner)
+- [x] Página WhatsApp: toggle "Lembrete antes do horário", input de horas, template editável com variáveis
+- [x] Settings API expõe/persiste os 3 campos novos
+
+**9. Design premium mobile-first:**
+- [x] `lucide-react` instalado — SVG icons substituem TODOS os emojis na navegação (Sidebar + bottom nav com glass blur)
+- [x] globals.css: utilitário `.glass-card` (liquid glass), `.rv-scale` (novo kind de reveal), active states táteis (`scale(0.98)` em botões, `.opt`, `.slot`, `.date-chip`), touch targets ≥44px (btn min-height 48, slots 44, close 44)
+- [x] Sticky CTA mobile: glass blur + linha dourada + animação `ctaGlow` pulsante (desativada em reduced-motion)
+- [x] Landing: nova seção "Depoimentos" (3 cards glass com reveals left/rise/right), galeria com reveal "scale", equipe com "rise"
+- [x] ScrollReveal ganha kind `"scale"`
+
+**`npx tsc --noEmit`:** ✅ zero erros · **`npm run build`:** ✅ 41 páginas/rotas compiladas
+
+### Pendências de deploy (EasyPanel) — adicionais da Fase 10
+- **Migration 0010:** `npm run db:migrate` no container `ssbarber` (idempotente)
+- **Cron de lembretes:** EasyPanel → Cron Jobs → a cada 15 min → `curl -X POST https://seudominio.com/api/gstsantos/whatsapp/trigger-reminders -H "Authorization: Bearer $CRON_SECRET"`
+- **Cadastrar produtos** em /gstsantos/products para habilitar venda no checkout
+- **Criar a recepcionista** em /gstsantos/barbers → perfil "Recepcionista" (recebe convite por e-mail; exige RESEND_API_KEY configurada)
 
 ### Bugs conhecidos não resolvidos
 - **`canCreateServices` permite gerenciar barbers**: flag ainda se chama `canCreateServices` no DB — semântica confusa, mas funcional. UI já exibe como "Barbeiro Admin". Renomear coluna no banco é trabalho futuro sem urgência.

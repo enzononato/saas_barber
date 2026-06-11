@@ -1,10 +1,17 @@
 import { and, eq, exists } from "drizzle-orm";
 
 import { db } from "@/server/db";
-import { appointments } from "@/server/db/schema";
+import { appointments, appointmentServices } from "@/server/db/schema";
 import { member, user } from "@/server/db/schema/auth";
 import { workingHours } from "@/server/db/schema/availability";
 import { isProfessionalAvailableAt } from "./availability";
+
+export type ServiceItem = {
+  serviceId: string;
+  name: string;
+  price: string;
+  durationMinutes: number;
+};
 
 export type Professional = {
   userId: string;
@@ -57,6 +64,8 @@ export type CreateAppointmentParams = {
   clientName: string;
   clientPhone: string;
   notes?: string;
+  /** Detalhamento por serviço (multi-serviço). Quando presente, grava em appointment_services. */
+  serviceItems?: ServiceItem[];
 };
 
 export type CreateAppointmentResult =
@@ -97,6 +106,24 @@ export async function createAppointment(
         endsAt: appointments.endsAt,
         professionalId: appointments.professionalId,
       });
+
+    // Detalhamento multi-serviço (falha aqui não cancela o agendamento)
+    if (params.serviceItems && params.serviceItems.length > 0) {
+      try {
+        await db.insert(appointmentServices).values(
+          params.serviceItems.map((item, idx) => ({
+            appointmentId: created.id,
+            serviceId: item.serviceId,
+            serviceNameAtBooking: item.name,
+            priceAtBooking: item.price,
+            durationMinutes: item.durationMinutes,
+            position: idx,
+          })),
+        );
+      } catch (err) {
+        console.error("[appointments] failed to insert service items:", err);
+      }
+    }
 
     return { ok: true, appointment: created };
   } catch (err) {

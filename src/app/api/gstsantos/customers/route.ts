@@ -22,8 +22,8 @@ export async function GET(req: Request) {
       ? sortByParam
       : "lastVisit";
 
-  // Barbeiro comum: vê só os clientes que atendeu
-  const scopeUserId = ctx.role === "owner" ? undefined : ctx.userId;
+  // Barbeiro comum: vê só os clientes que atendeu. Owner e recepcionista veem todos.
+  const scopeUserId = ctx.role === "member" ? ctx.userId : undefined;
 
   const result = await listCustomers({
     orgId: ctx.orgId,

@@ -6,15 +6,19 @@ import { db } from "@/server/db";
 import { member } from "@/server/db/schema/auth";
 import { getOrgBySlug } from "@/server/services/tenant";
 
+export type MemberRole = "owner" | "member" | "receptionist";
+
 export interface AuthContext {
   userId: string;
   userName: string;
   userEmail: string;
   memberId: string;
-  role: "owner" | "member";
+  role: MemberRole;
   canCreateServices: boolean;
   isBarber: boolean;
   orgId: string;
+  /** Owner e recepcionista enxergam/gerenciam a agenda de todos os profissionais. */
+  canManageAllAppointments: boolean;
 }
 
 export async function requireAuth(): Promise<AuthContext | null> {
@@ -37,15 +41,17 @@ export async function requireAuth(): Promise<AuthContext | null> {
 
   if (rows.length === 0) return null;
   const m = rows[0];
+  const role = m.role as MemberRole;
 
   return {
     userId: session.user.id,
     userName: session.user.name,
     userEmail: session.user.email,
     memberId: m.id,
-    role: m.role as "owner" | "member",
+    role,
     canCreateServices: m.canCreateServices,
     isBarber: m.isBarber,
     orgId: org.id,
+    canManageAllAppointments: role === "owner" || role === "receptionist",
   };
 }

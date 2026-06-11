@@ -8,6 +8,9 @@ const DEFAULT_BOOKING_TEMPLATE =
 const DEFAULT_FOLLOWUP_TEMPLATE =
   "Olá {{nome}}! Já faz {{dias}} dias desde o seu último corte 😄 Que tal agendar? {{link}}";
 
+const DEFAULT_REMINDER_TEMPLATE =
+  "Olá {{nome}}! Passando para lembrar do seu horário hoje às {{hora}} com {{barbeiro}}. Até já! ✂️";
+
 export const whatsappSettings = pgTable("whatsapp_settings", {
   id: uuid("id").primaryKey().defaultRandom(),
   organizationId: text("organization_id")
@@ -27,6 +30,10 @@ export const whatsappSettings = pgTable("whatsapp_settings", {
   followUpDays: integer("follow_up_days").notNull().default(30),
   bookingTemplate: text("booking_template").notNull().default(DEFAULT_BOOKING_TEMPLATE),
   followUpTemplate: text("follow_up_template").notNull().default(DEFAULT_FOLLOWUP_TEMPLATE),
+  // Lembrete pré-agendamento
+  reminderEnabled: boolean("reminder_enabled").notNull().default(true),
+  reminderHoursBefore: integer("reminder_hours_before").notNull().default(2),
+  reminderTemplate: text("reminder_template").notNull().default(DEFAULT_REMINDER_TEMPLATE),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
@@ -50,4 +57,5 @@ export const followUpLog = pgTable(
 export const WHATSAPP_DEFAULTS = {
   bookingTemplate: DEFAULT_BOOKING_TEMPLATE,
   followUpTemplate: DEFAULT_FOLLOWUP_TEMPLATE,
+  reminderTemplate: DEFAULT_REMINDER_TEMPLATE,
 } as const;

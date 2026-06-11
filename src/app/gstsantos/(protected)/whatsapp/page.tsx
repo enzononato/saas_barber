@@ -10,12 +10,17 @@ interface WhatsappSettings {
   followUpDays: number;
   bookingTemplate: string;
   followUpTemplate: string;
+  reminderEnabled: boolean;
+  reminderHoursBefore: number;
+  reminderTemplate: string;
 }
 
 const DEFAULT_BOOKING =
   "Olá {{nome}}! ✅ Agendamento confirmado para {{data}} às {{hora}} com {{barbeiro}} ({{servico}}). Até lá! ✂️";
 const DEFAULT_FOLLOWUP =
   "Olá {{nome}}! Já faz {{dias}} dias desde o seu último corte 😄 Que tal agendar? {{link}}";
+const DEFAULT_REMINDER =
+  "Olá {{nome}}! Passando para lembrar do seu horário hoje às {{hora}} com {{barbeiro}}. Até já! ✂️";
 
 function formatPhone(raw: string | null): string {
   if (!raw) return "";
@@ -39,6 +44,9 @@ export default function WhatsappPage() {
     followUpDays: 30,
     bookingTemplate: DEFAULT_BOOKING,
     followUpTemplate: DEFAULT_FOLLOWUP,
+    reminderEnabled: true,
+    reminderHoursBefore: 2,
+    reminderTemplate: DEFAULT_REMINDER,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -221,6 +229,9 @@ export default function WhatsappPage() {
         followUpDays: settings.followUpDays,
         bookingTemplate: settings.bookingTemplate,
         followUpTemplate: settings.followUpTemplate,
+        reminderEnabled: settings.reminderEnabled,
+        reminderHoursBefore: settings.reminderHoursBefore,
+        reminderTemplate: settings.reminderTemplate,
       }),
     });
     setSaving(false);
@@ -335,6 +346,31 @@ export default function WhatsappPage() {
             style={{ ...inputStyle, width: 80, textAlign: "center" }}
           />
         </div>
+        <div style={{ ...rowBetween, marginTop: 14 }}>
+          <span style={{ color: "#C8C2B4", fontSize: 14 }}>Lembrete antes do horário</span>
+          <ToggleSwitch
+            checked={settings.reminderEnabled}
+            onChange={() => setSettings((s) => ({ ...s, reminderEnabled: !s.reminderEnabled }))}
+          />
+        </div>
+        {settings.reminderEnabled && (
+          <div style={{ ...rowBetween, marginTop: 14 }}>
+            <span style={{ color: "#C8C2B4", fontSize: 14 }}>Enviar (horas antes)</span>
+            <input
+              type="number"
+              min={1}
+              max={48}
+              value={settings.reminderHoursBefore}
+              onChange={(e) =>
+                setSettings((s) => ({
+                  ...s,
+                  reminderHoursBefore: parseInt(e.target.value, 10) || 2,
+                }))
+              }
+              style={{ ...inputStyle, width: 80, textAlign: "center" }}
+            />
+          </div>
+        )}
       </Section>
 
       <Section title="Templates de mensagem">
@@ -355,6 +391,15 @@ export default function WhatsappPage() {
             style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }}
           />
           <Hint>Variáveis: {`{{nome}} {{dias}} {{link}}`}</Hint>
+        </Field>
+        <Field label="Lembrete pré-agendamento">
+          <textarea
+            value={settings.reminderTemplate}
+            onChange={(e) => setSettings((s) => ({ ...s, reminderTemplate: e.target.value }))}
+            rows={3}
+            style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }}
+          />
+          <Hint>Variáveis: {`{{nome}} {{hora}} {{barbeiro}} {{servico}}`}</Hint>
         </Field>
       </Section>
 

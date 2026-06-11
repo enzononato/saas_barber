@@ -172,7 +172,7 @@ function Gallery() {
 
         <div className="work-grid">
           {GALLERY_PHOTOS.map((p, i) => (
-            <Reveal key={i} className={`wphoto ${p.cls}`} delay={Math.min(i, 5) * 60}>
+            <Reveal key={i} className={`wphoto ${p.cls}`} kind="scale" delay={Math.min(i, 5) * 60}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={p.src}
@@ -285,7 +285,7 @@ function Team({ members }: { members: Member[] }) {
         </Reveal>
         <div className="team-grid team-grid--two">
           {real.map((m, i) => (
-            <Reveal key={m.id} className="member" delay={i * 100}>
+            <Reveal key={m.id} className="member" kind="rise" delay={i * 100}>
               <div className="ph">
                 <div className="tag">{String(i + 1).padStart(2, "0")}</div>
                 <svg
@@ -311,6 +311,70 @@ function Team({ members }: { members: Member[] }) {
   );
 }
 
+const TESTIMONIALS = [
+  {
+    quote:
+      "Melhor barbearia de Juazeiro, sem discussão. Agendo pelo site em um minuto e nunca esperei na cadeira.",
+    name: "Carlos M.",
+    since: "Cliente desde 2023",
+  },
+  {
+    quote:
+      "O degradê fica impecável toda vez. O lembrete no WhatsApp salva minha vida — nunca mais perdi horário.",
+    name: "Rafael S.",
+    since: "Cliente desde 2024",
+  },
+  {
+    quote:
+      "Trato barba e cabelo no mesmo horário. Atendimento de primeira, ambiente top e preço justo.",
+    name: "João P.",
+    since: "Cliente desde 2024",
+  },
+];
+
+function Testimonials() {
+  return (
+    <section className="block" id="depoimentos">
+      <div className="container">
+        <Reveal className="sec-head">
+          <span className="eyebrow">04 — Depoimentos</span>
+          <h2>
+            Quem senta, <span className="ital">volta</span>.
+          </h2>
+          <p className="sub">
+            A palavra de quem já passou pela cadeira vale mais que qualquer anúncio.
+          </p>
+        </Reveal>
+        <div className="testi-grid">
+          {TESTIMONIALS.map((t, i) => (
+            <Reveal
+              key={t.name}
+              className="testi-card glass-card"
+              kind={i === 0 ? "left" : i === 1 ? "rise" : "right"}
+              delay={i * 110}
+            >
+              <div className="stars" aria-label="5 de 5 estrelas">
+                {Array.from({ length: 5 }).map((_, s) => (
+                  <Icons.Star key={s} />
+                ))}
+              </div>
+              <p className="quote">"{t.quote}"</p>
+              <div className="who">
+                <span className="av">{t.name[0]}</span>
+                <span>
+                  <span className="nm">{t.name}</span>
+                  <br />
+                  <span className="since">{t.since}</span>
+                </span>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function Location() {
   const hours = [
     { day: "Segunda", h: "09h – 19h" },
@@ -325,7 +389,7 @@ function Location() {
     <section className="block" id="contato">
       <div className="container">
         <Reveal className="sec-head">
-          <span className="eyebrow">04 — Localização</span>
+          <span className="eyebrow">05 — Localização</span>
           <h2>
             Onde a casa te <span className="ital">espera</span>.
           </h2>
@@ -439,6 +503,7 @@ export function BookingPage({
       <Gallery />
       <Services services={initialServices} onBook={(s) => openWizard(s)} />
       <Team members={teamMembers} />
+      <Testimonials />
       <Location />
       <Footer />
 

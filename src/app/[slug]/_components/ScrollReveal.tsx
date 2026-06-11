@@ -47,7 +47,7 @@ interface RevealProps {
   as?: ElementType;
   className?: string;
   style?: CSSProperties;
-  kind?: "up" | "fade" | "rise" | "left" | "right";
+  kind?: "up" | "fade" | "rise" | "left" | "right" | "scale";
   [key: string]: unknown;
 }
 

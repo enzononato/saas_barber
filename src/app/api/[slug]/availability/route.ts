@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { services } from "@/server/db/schema";
@@ -28,25 +28,29 @@ export async function GET(
     );
   }
 
-  const { memberId, serviceId, date } = parsed.data;
+  const { memberId, serviceId, serviceIds, date } = parsed.data;
+
+  // Multi-serviço: soma a duração de todos os serviços selecionados
+  const ids = serviceIds ? serviceIds.split(",") : [serviceId!];
 
   const svcRows = await db
-    .select({ durationMinutes: services.durationMinutes })
+    .select({ id: services.id, durationMinutes: services.durationMinutes })
     .from(services)
     .where(
       and(
         eq(services.organizationId, org.id),
-        eq(services.id, serviceId),
+        inArray(services.id, ids),
         eq(services.isActive, true),
       ),
-    )
-    .limit(1);
+    );
 
-  if (svcRows.length === 0) {
+  if (svcRows.length !== ids.length) {
     return NextResponse.json({ error: "service_not_found" }, { status: 404 });
   }
 
-  const slots = await getAvailableSlots(org.id, memberId, svcRows[0].durationMinutes, date, org.timezone);
+  const totalDuration = svcRows.reduce((sum, s) => sum + s.durationMinutes, 0);
+
+  const slots = await getAvailableSlots(org.id, memberId, totalDuration, date, org.timezone);
 
   return NextResponse.json({
     slots: slots.map((s) => ({

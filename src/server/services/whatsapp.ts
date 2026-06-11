@@ -1,9 +1,9 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { whatsappSettings, followUpLog } from "@/server/db/schema/whatsapp";
 import { appointments } from "@/server/db/schema/appointments";
-import { organization } from "@/server/db/schema/auth";
+import { organization, user } from "@/server/db/schema/auth";
 import { env } from "@/lib/env";
 import { sendText, instanceNameForSlug } from "./evolution";
 
@@ -74,6 +74,8 @@ export type BookingNotificationParams = {
   timezone: string;
   serviceNameAtBooking: string;
   professionalName: string;
+  /** Link público para o cliente cancelar/reagendar de forma autônoma. */
+  manageUrl?: string;
 };
 
 export async function sendBookingConfirmationIfEnabled(
@@ -95,7 +97,7 @@ export async function sendBookingConfirmationIfEnabled(
     minute: "2-digit",
   }).format(params.startsAt);
 
-  const text = applyTemplate(settings.bookingTemplate, {
+  let text = applyTemplate(settings.bookingTemplate, {
     nome: params.customerName,
     data: dateStr,
     hora: timeStr,
@@ -103,7 +105,104 @@ export async function sendBookingConfirmationIfEnabled(
     servico: params.serviceNameAtBooking,
   });
 
+  if (params.manageUrl) {
+    text += `\n\nPrecisa remarcar ou cancelar? É só acessar:\n${params.manageUrl}`;
+  }
+
   return sendText(settings.instanceName!, params.customerPhone, text, randomDelay(3000, 12000));
+}
+
+/**
+ * Lembrete pré-agendamento: encontra agendamentos SCHEDULED que começam dentro
+ * da janela configurada (reminder_hours_before) e ainda não receberam lembrete.
+ * Dedup via appointments.reminder_sent_at — seguro rodar o cron a cada 10-15 min.
+ */
+export async function triggerRemindersForOrg(
+  orgId: string,
+): Promise<{ sent: number; skipped: number }> {
+  const settings = await getWhatsappSettings(orgId);
+  if (!settings || !isInstanceConnected(settings) || !settings.reminderEnabled) {
+    return { sent: 0, skipped: 0 };
+  }
+
+  const [org] = await db
+    .select({ timezone: organization.timezone })
+    .from(organization)
+    .where(eq(organization.id, orgId))
+    .limit(1);
+  const timezone = org?.timezone ?? "America/Sao_Paulo";
+
+  const hours = Math.max(1, settings.reminderHoursBefore);
+
+  const upcoming = await db
+    .select({
+      id: appointments.id,
+      customerName: appointments.customerName,
+      customerPhone: appointments.customerPhone,
+      startsAt: appointments.startsAt,
+      professionalId: appointments.professionalId,
+      serviceName: appointments.serviceNameAtBooking,
+    })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.organizationId, orgId),
+        eq(appointments.status, "SCHEDULED"),
+        sql`${appointments.reminderSentAt} IS NULL`,
+        sql`${appointments.startsAt} > NOW()`,
+        sql`${appointments.startsAt} <= NOW() + (${hours} || ' hours')::interval`,
+      ),
+    );
+
+  if (upcoming.length === 0) return { sent: 0, skipped: 0 };
+
+  // Resolve nomes dos profissionais uma única vez
+  const profIds = Array.from(new Set(upcoming.map((a) => a.professionalId)));
+  const profs = await db
+    .select({ id: user.id, name: user.name })
+    .from(user)
+    .where(inArray(user.id, profIds));
+  const profName = new Map(profs.map((p) => [p.id, p.name]));
+
+  let sent = 0;
+  let skipped = 0;
+
+  for (const apt of upcoming) {
+    const timeStr = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: timezone,
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(apt.startsAt);
+
+    const text = applyTemplate(settings.reminderTemplate, {
+      nome: apt.customerName,
+      hora: timeStr,
+      barbeiro: profName.get(apt.professionalId) ?? "seu barbeiro",
+      servico: apt.serviceName,
+    });
+
+    const ok = await sendText(
+      settings.instanceName!,
+      apt.customerPhone,
+      text,
+      randomDelay(2000, 5000),
+    );
+
+    if (ok) {
+      await db
+        .update(appointments)
+        .set({ reminderSentAt: new Date() })
+        .where(eq(appointments.id, apt.id));
+      sent++;
+    } else {
+      skipped++;
+    }
+
+    // Pausa entre envios para evitar rajada
+    await sleep(randomDelay(4000, 9000));
+  }
+
+  return { sent, skipped };
 }
 
 /**

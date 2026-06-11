@@ -7,7 +7,7 @@ interface Barber {
   userId: string;
   name: string;
   email: string;
-  role: "owner" | "member";
+  role: "owner" | "member" | "receptionist";
   isBarber: boolean;
   hasWorkingHours: boolean;
   createdAt: string;
@@ -15,14 +15,13 @@ interface Barber {
 
 interface Me {
   id: string;
-  role: "owner" | "member";
+  role: "owner" | "member" | "receptionist";
   isBarber: boolean;
 }
 
-interface CreatedCredentials {
+interface CreatedInvite {
   name: string;
   email: string;
-  tempPassword: string;
 }
 
 interface CommissionRow {
@@ -46,10 +45,13 @@ export default function BarbersPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", role: "member" as "owner" | "member" });
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    role: "member" as "owner" | "member" | "receptionist",
+  });
   const [saving, setSaving] = useState(false);
-  const [credentials, setCredentials] = useState<CreatedCredentials | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [invited, setInvited] = useState<CreatedInvite | null>(null);
   const [commissionsBarber, setCommissionsBarber] = useState<Barber | null>(null);
   const [commissionRows, setCommissionRows] = useState<CommissionRow[]>([]);
   const [commissionsLoading, setCommissionsLoading] = useState(false);
@@ -73,19 +75,24 @@ export default function BarbersPage() {
     const res = await fetch("/api/gstsantos/barbers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: form.name, email: form.email, role: form.role, isBarber: true }),
+      body: JSON.stringify({
+        name: form.name,
+        email: form.email,
+        role: form.role,
+        isBarber: form.role !== "receptionist",
+      }),
     });
     setSaving(false);
 
     if (res.ok) {
-      const data = await res.json() as { name: string; email: string; tempPassword: string };
+      const data = await res.json() as { name: string; email: string };
       setShowModal(false);
       setForm({ name: "", email: "", role: "member" });
-      setCredentials({ name: data.name, email: data.email, tempPassword: data.tempPassword });
+      setInvited({ name: data.name, email: data.email });
       await fetchAll();
     } else {
       const err = await res.json() as { error: string };
-      alert(err.error === "email_already_exists" ? "Este e-mail já está cadastrado." : (err.error ?? "Erro ao criar barbeiro."));
+      alert(err.error === "email_already_exists" ? "Este e-mail já está cadastrado." : (err.error ?? "Erro ao criar membro."));
     }
   }
 
@@ -121,12 +128,6 @@ export default function BarbersPage() {
       body: JSON.stringify({ role: newRole }),
     });
     await fetchAll();
-  }
-
-  function copyCredentials(creds: CreatedCredentials) {
-    void navigator.clipboard.writeText(`Email: ${creds.email}\nSenha: ${creds.tempPassword}`);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   }
 
   async function openCommissions(b: Barber) {
@@ -259,6 +260,9 @@ export default function BarbersPage() {
                     {b.role === "member" && (
                       <span style={badgeStyle("#C8C2B4", "rgba(200,194,180,0.1)")}>Barbeiro</span>
                     )}
+                    {b.role === "receptionist" && (
+                      <span style={badgeStyle("#7DD3FC", "rgba(125,211,252,0.1)")}>Recepcionista</span>
+                    )}
                     {b.isBarber && !b.hasWorkingHours && (
                       <span
                         title="Configure os horários em Minha Agenda para este barbeiro aparecer no booking"
@@ -274,17 +278,22 @@ export default function BarbersPage() {
                 {/* Controls — owner only, not on self */}
                 {me?.role === "owner" && !isMe && (
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    {/* Toggle role */}
-                    <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "#C8C2B4" }}>
-                      <ToggleSwitch checked={b.role === "owner"} onChange={() => void toggleRole(b)} />
-                      Acesso total
-                    </label>
+                    {/* Recepcionista não tem toggles de barbeiro/acesso */}
+                    {b.role !== "receptionist" && (
+                      <>
+                        {/* Toggle role */}
+                        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "#C8C2B4" }}>
+                          <ToggleSwitch checked={b.role === "owner"} onChange={() => void toggleRole(b)} />
+                          Acesso total
+                        </label>
 
-                    {/* Toggle isBarber */}
-                    <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "#C8C2B4" }}>
-                      <ToggleSwitch checked={b.isBarber} onChange={() => void toggleIsBarber(b)} />
-                      É barbeiro
-                    </label>
+                        {/* Toggle isBarber */}
+                        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "#C8C2B4" }}>
+                          <ToggleSwitch checked={b.isBarber} onChange={() => void toggleIsBarber(b)} />
+                          É barbeiro
+                        </label>
+                      </>
+                    )}
 
                     {b.isBarber && (
                       <button
@@ -352,10 +361,10 @@ export default function BarbersPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <h2 style={{ margin: "0 0 6px", color: "#F4EEDF", fontSize: 18 }}>
-              Adicionar barbeiro
+              Adicionar membro da equipe
             </h2>
             <p style={{ margin: "0 0 20px", color: "#8A847A", fontSize: 13 }}>
-              As credenciais serão exibidas após a criação.
+              A pessoa recebe um e-mail de boas-vindas com link para criar a própria senha.
             </p>
 
             <Field label="Nome">
@@ -377,12 +386,18 @@ export default function BarbersPage() {
             </Field>
 
             <Field label="Perfil">
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <ProfileOption
                   selected={form.role === "member"}
                   onClick={() => setForm((f) => ({ ...f, role: "member" }))}
                   title="Barbeiro"
-                  description="Acessa apenas a própria agenda"
+                  description="Acessa apenas a própria agenda e clientes"
+                />
+                <ProfileOption
+                  selected={form.role === "receptionist"}
+                  onClick={() => setForm((f) => ({ ...f, role: "receptionist" }))}
+                  title="Recepcionista"
+                  description="Gerencia agenda de todos, clientes e caixa — sem métricas avançadas"
                 />
                 <ProfileOption
                   selected={form.role === "owner"}
@@ -525,8 +540,8 @@ export default function BarbersPage() {
         </div>
       )}
 
-      {/* Credentials modal */}
-      {credentials && (
+      {/* Invite sent modal */}
+      {invited && (
         <div
           style={{
             position: "fixed",
@@ -558,57 +573,35 @@ export default function BarbersPage() {
                   background: "rgba(74,222,128,0.15)",
                   display: "grid",
                   placeItems: "center",
+                  color: "#4ADE80",
                   fontSize: 18,
+                  fontWeight: 700,
                 }}
               >
                 ✓
               </div>
               <div>
                 <p style={{ margin: 0, fontWeight: 700, color: "#F4EEDF", fontSize: 16 }}>
-                  Barbeiro criado!
+                  Convite enviado!
                 </p>
                 <p style={{ margin: 0, color: "#8A847A", fontSize: 12 }}>
-                  Compartilhe as credenciais com {credentials.name}
+                  {invited.name} foi adicionado à equipe
                 </p>
               </div>
             </div>
 
-            <div
-              style={{
-                background: "#0B0B0B",
-                border: "1px solid #2A2620",
-                borderRadius: 10,
-                padding: "14px 16px",
-                marginBottom: 16,
-                fontFamily: "monospace",
-              }}
-            >
-              <p style={{ margin: "0 0 6px", fontSize: 12, color: "#8A847A" }}>E-mail</p>
-              <p style={{ margin: "0 0 14px", fontSize: 14, color: "#F4EEDF" }}>{credentials.email}</p>
-              <p style={{ margin: "0 0 6px", fontSize: 12, color: "#8A847A" }}>Senha temporária</p>
-              <p style={{ margin: 0, fontSize: 14, color: "#C9A84C", wordBreak: "break-all" }}>
-                {credentials.tempPassword}
-              </p>
-            </div>
-
-            <p style={{ margin: "0 0 20px", fontSize: 12, color: "#8A847A" }}>
-              O barbeiro deve acessar o sistema com estas credenciais e alterar a senha. Um e-mail de redefinição também foi enviado (se configurado).
+            <p style={{ margin: "0 0 20px", fontSize: 13, color: "#C8C2B4", lineHeight: 1.5 }}>
+              Enviamos um e-mail de boas-vindas para{" "}
+              <span style={{ color: "#C9A84C" }}>{invited.email}</span> com um link
+              para criar a senha de acesso ao painel. O link expira em 1 hora.
             </p>
 
-            <div style={{ display: "flex", gap: 10 }}>
-              <button
-                onClick={() => copyCredentials(credentials)}
-                style={{ ...ghostBtn, flex: 1 }}
-              >
-                {copied ? "Copiado!" : "Copiar credenciais"}
-              </button>
-              <button
-                onClick={() => setCredentials(null)}
-                style={{ ...primaryBtn, flex: 1, marginLeft: 0 }}
-              >
-                Fechar
-              </button>
-            </div>
+            <button
+              onClick={() => setInvited(null)}
+              style={{ ...primaryBtn, width: "100%", marginLeft: 0 }}
+            >
+              Entendi
+            </button>
           </div>
         </div>
       )}

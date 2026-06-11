@@ -32,8 +32,8 @@ interface WizardProps {
   presetService: Service | null;
 }
 
-const fmtPrice = (price: string) =>
-  `R$ ${parseFloat(price).toFixed(2).replace(".", ",")}`;
+const fmtPrice = (price: string | number) =>
+  `R$ ${parseFloat(String(price)).toFixed(2).replace(".", ",")}`;
 
 const fmtDuration = (min: number) => {
   if (min < 60) return `${min} min`;
@@ -43,7 +43,7 @@ const fmtDuration = (min: number) => {
 };
 
 const STEP_TITLES = [
-  "Escolha o serviço",
+  "Escolha os serviços",
   "Quem corta hoje?",
   "Data e horário",
   "Seus dados",
@@ -90,12 +90,12 @@ function StepService({
   services,
   loading,
   selected,
-  onSelect,
+  onToggle,
 }: {
   services: Service[];
   loading: boolean;
-  selected: Service | null;
-  onSelect: (s: Service) => void;
+  selected: Service[];
+  onToggle: (s: Service) => void;
 }) {
   if (loading) {
     return (
@@ -105,33 +105,50 @@ function StepService({
       </div>
     );
   }
+
+  const totalPrice = selected.reduce((sum, s) => sum + parseFloat(s.price), 0);
+  const totalDuration = selected.reduce((sum, s) => sum + s.durationMinutes, 0);
+
   return (
     <div className="wz-step">
       <p style={{ color: "var(--paper-mute)", fontSize: 14, marginBottom: 18 }}>
-        Selecione um serviço para continuar. O tempo na cadeira é estimado.
+        Escolha um ou mais serviços — dá pra combinar corte, barba e mais no
+        mesmo horário.
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {services.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            className={`opt ${selected?.id === s.id ? "sel" : ""}`}
-            onClick={() => onSelect(s)}
-          >
-            <div className="body">
-              <div className="ttl">{s.name}</div>
-              <div className="sub">{s.description}</div>
-            </div>
-            <div className="right">
-              <div className="price">{fmtPrice(s.price)}</div>
-              <div className="dur">{fmtDuration(s.durationMinutes)}</div>
-            </div>
-            <div className="check">
-              <Icons.Check />
-            </div>
-          </button>
-        ))}
+        {services.map((s) => {
+          const isSel = selected.some((x) => x.id === s.id);
+          return (
+            <button
+              key={s.id}
+              type="button"
+              className={`opt ${isSel ? "sel" : ""}`}
+              onClick={() => onToggle(s)}
+            >
+              <div className="body">
+                <div className="ttl">{s.name}</div>
+                <div className="sub">{s.description}</div>
+              </div>
+              <div className="right">
+                <div className="price">{fmtPrice(s.price)}</div>
+                <div className="dur">{fmtDuration(s.durationMinutes)}</div>
+              </div>
+              <div className="check">
+                <Icons.Check />
+              </div>
+            </button>
+          );
+        })}
       </div>
+
+      {selected.length > 1 && (
+        <div className="wz-combo-bar">
+          <span className="n">{selected.length} serviços</span>
+          <span className="t">
+            {fmtDuration(totalDuration)} · <strong>{fmtPrice(totalPrice)}</strong>
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -196,7 +213,7 @@ function StepMember({
 function StepDateAndTime({
   slug,
   memberId,
-  serviceId,
+  serviceIds,
   selectedDate,
   selectedSlot,
   onSelectDate,
@@ -204,7 +221,7 @@ function StepDateAndTime({
 }: {
   slug: string;
   memberId: string;
-  serviceId: string;
+  serviceIds: string;
   selectedDate: Date | null;
   selectedSlot: Slot | null;
   onSelectDate: (d: Date) => void;
@@ -225,7 +242,7 @@ function StepDateAndTime({
           const k = fmtDateKey(d);
           try {
             const r = await fetch(
-              `/api/${slug}/availability?memberId=${memberId}&serviceId=${serviceId}&date=${k}`,
+              `/api/${slug}/availability?memberId=${memberId}&serviceIds=${serviceIds}&date=${k}`,
             );
             const json = await r.json();
             return [k, (json.slots?.length ?? 0) > 0] as [string, boolean];
@@ -240,7 +257,8 @@ function StepDateAndTime({
       }
     })();
     return () => { cancelled = true; };
-  }, [slug, memberId, serviceId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, memberId, serviceIds]);
 
   useEffect(() => {
     if (!selectedDate) { setSlots([]); return; }
@@ -249,7 +267,7 @@ function StepDateAndTime({
     (async () => {
       try {
         const r = await fetch(
-          `/api/${slug}/availability?memberId=${memberId}&serviceId=${serviceId}&date=${fmtDateKey(selectedDate)}`,
+          `/api/${slug}/availability?memberId=${memberId}&serviceIds=${serviceIds}&date=${fmtDateKey(selectedDate)}`,
         );
         const json = await r.json();
         if (!cancelled) setSlots(json.slots ?? []);
@@ -260,7 +278,7 @@ function StepDateAndTime({
       }
     })();
     return () => { cancelled = true; };
-  }, [slug, memberId, serviceId, selectedDate]);
+  }, [slug, memberId, serviceIds, selectedDate]);
 
   const groups = useMemo(() => {
     const m: Slot[] = [], t: Slot[] = [], n: Slot[] = [];
@@ -453,14 +471,16 @@ function StepConfirm({
   payload,
   errorMsg,
 }: {
-  payload: { service: Service; member: Member; slot: Slot; clientName: string; clientPhone: string; notes: string };
+  payload: { services: Service[]; member: Member; slot: Slot; clientName: string; clientPhone: string; notes: string };
   errorMsg: string | null;
 }) {
-  const { service, member, slot, clientName, clientPhone, notes } = payload;
+  const { services, member, slot, clientName, clientPhone, notes } = payload;
   const start = new Date(slot.startsAt);
   const end = new Date(slot.endsAt);
   const dateStr = `${DOW_PT[start.getDay()]}, ${start.getDate()} de ${MON_FULL[start.getMonth()]}`;
   const timeStr = `${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")} – ${String(end.getHours()).padStart(2, "0")}:${String(end.getMinutes()).padStart(2, "0")}`;
+  const totalPrice = services.reduce((sum, s) => sum + parseFloat(s.price), 0);
+  const totalDuration = services.reduce((sum, s) => sum + s.durationMinutes, 0);
   return (
     <div className="wz-step">
       {errorMsg && <div className="err-banner">{errorMsg}</div>}
@@ -469,10 +489,10 @@ function StepConfirm({
       </p>
       <div className="conf-card">
         <div className="conf-row">
-          <span className="k">Serviço</span>
+          <span className="k">{services.length > 1 ? "Serviços" : "Serviço"}</span>
           <span className="v">
-            <span className="big">{service.name}</span>
-            {fmtDuration(service.durationMinutes)} · {fmtPrice(service.price)}
+            <span className="big">{services.map((s) => s.name).join(" + ")}</span>
+            {fmtDuration(totalDuration)} · {fmtPrice(totalPrice)}
           </span>
         </div>
         <div className="conf-row">
@@ -513,8 +533,8 @@ function StepSuccess({
   onAgain,
   onClose,
 }: {
-  appt: { id: string; startsAt: string; endsAt: string };
-  payload: { service: Service; member: Member; clientName: string };
+  appt: { id: string; startsAt: string; endsAt: string; manageUrl?: string };
+  payload: { services: Service[]; member: Member; clientName: string };
   onAgain: () => void;
   onClose: () => void;
 }) {
@@ -533,13 +553,13 @@ function StepSuccess({
       <div className="conf-card" style={{ textAlign: "left", marginTop: 24 }}>
         <div className="conf-row">
           <span className="k">Código</span>
-          <span className="v mono" style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--gold)" }}>
-            {appt.id.toUpperCase()}
+          <span className="v mono" style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--gold)", fontSize: 11 }}>
+            {appt.id.slice(0, 8).toUpperCase()}
           </span>
         </div>
         <div className="conf-row">
-          <span className="k">Serviço</span>
-          <span className="v">{payload.service.name}</span>
+          <span className="k">{payload.services.length > 1 ? "Serviços" : "Serviço"}</span>
+          <span className="v">{payload.services.map((s) => s.name).join(" + ")}</span>
         </div>
         <div className="conf-row">
           <span className="k">Profissional</span>
@@ -561,6 +581,18 @@ function StepSuccess({
           </span>
         </div>
       </div>
+      {appt.manageUrl && (
+        <p style={{ marginTop: 16, fontSize: 12, color: "var(--paper-mute)", lineHeight: 1.5 }}>
+          Precisa remarcar ou cancelar?{" "}
+          <a
+            href={appt.manageUrl}
+            style={{ color: "var(--gold)", textDecoration: "underline" }}
+          >
+            Gerencie seu agendamento aqui
+          </a>
+          .
+        </p>
+      )}
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 24 }}>
         <button className="btn btn-primary" onClick={onAgain}>
           Agendar outro horário
@@ -584,7 +616,7 @@ export function Wizard({
   presetService,
 }: WizardProps) {
   const [step, setStep] = useState(1);
-  const [service, setService] = useState<Service | null>(null);
+  const [selectedServices, setSelectedServices] = useState<Service[]>([]);
   const [member, setMember] = useState<Member | null>(null);
   const [date, setDate] = useState<Date | null>(null);
   const [slot, setSlot] = useState<Slot | null>(null);
@@ -592,15 +624,19 @@ export function Wizard({
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [success, setSuccess] = useState<{ id: string; startsAt: string; endsAt: string } | null>(null);
+  const [success, setSuccess] = useState<{ id: string; startsAt: string; endsAt: string; manageUrl?: string } | null>(null);
 
   const setForm = (patch: Partial<FormState>) => setFormState((f) => ({ ...f, ...patch }));
 
+  const serviceIdsKey = useMemo(
+    () => selectedServices.map((s) => s.id).join(","),
+    [selectedServices],
+  );
+
   useEffect(() => {
     // Só aplica o preset quando o wizard ABRE com um preset definido
-    // (evita pular pra step 2 se user voltar pra step 1 e mudar o serviço)
-    if (open && presetService && !service) {
-      setService(presetService);
+    if (open && presetService && selectedServices.length === 0) {
+      setSelectedServices([presetService]);
       setStep(2);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -610,7 +646,7 @@ export function Wizard({
     if (!open) {
       const t = setTimeout(() => {
         setStep(1);
-        setService(null);
+        setSelectedServices([]);
         setMember(null);
         setDate(null);
         setSlot(null);
@@ -624,10 +660,20 @@ export function Wizard({
     }
   }, [open]);
 
-  useEffect(() => { setDate(null); setSlot(null); }, [member?.id, service?.id]);
+  useEffect(() => { setDate(null); setSlot(null); }, [member?.id, serviceIdsKey]);
+
+  function toggleService(s: Service) {
+    setSelectedServices((sel) =>
+      sel.some((x) => x.id === s.id)
+        ? sel.filter((x) => x.id !== s.id)
+        : sel.length >= 5
+          ? sel
+          : [...sel, s],
+    );
+  }
 
   const validate = () => {
-    if (step === 1) return !!service;
+    if (step === 1) return selectedServices.length > 0;
     if (step === 2) return !!member;
     if (step === 3) return !!date && !!slot;
     if (step === 4) {
@@ -656,7 +702,7 @@ export function Wizard({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          serviceId: service!.id,
+          serviceIds: selectedServices.map((s) => s.id),
           memberId: member!.id,
           startsAt: slot!.startsAt,
           clientName: form.clientName.trim(),
@@ -697,7 +743,7 @@ export function Wizard({
   const handleAgain = () => {
     setSuccess(null);
     setStep(1);
-    setService(null);
+    setSelectedServices([]);
     setMember(null);
     setDate(null);
     setSlot(null);
@@ -707,7 +753,7 @@ export function Wizard({
   };
 
   const canNext = useMemo(() => {
-    if (step === 1) return !!service;
+    if (step === 1) return selectedServices.length > 0;
     if (step === 2) return !!member;
     if (step === 3) return !!date && !!slot;
     if (step === 4) {
@@ -715,7 +761,7 @@ export function Wizard({
       return form.clientName.trim().length >= 2 && digits.length >= 10;
     }
     return true;
-  }, [step, service, member, date, slot, form]);
+  }, [step, selectedServices, member, date, slot, form]);
 
   return (
     <>
@@ -746,7 +792,7 @@ export function Wizard({
           {success ? (
             <StepSuccess
               appt={success}
-              payload={{ service: service!, member: member!, clientName: form.clientName }}
+              payload={{ services: selectedServices, member: member!, clientName: form.clientName }}
               onAgain={handleAgain}
               onClose={onClose}
             />
@@ -756,8 +802,8 @@ export function Wizard({
                 <StepService
                   services={services}
                   loading={loadingServices}
-                  selected={service}
-                  onSelect={setService}
+                  selected={selectedServices}
+                  onToggle={toggleService}
                 />
               )}
               {step === 2 && (
@@ -768,11 +814,11 @@ export function Wizard({
                   onSelect={setMember}
                 />
               )}
-              {step === 3 && member && service && (
+              {step === 3 && member && selectedServices.length > 0 && (
                 <StepDateAndTime
                   slug={slug}
                   memberId={member.id}
-                  serviceId={service.id}
+                  serviceIds={serviceIdsKey}
                   selectedDate={date}
                   selectedSlot={slot}
                   onSelectDate={(d) => { setDate(d); setSlot(null); }}
@@ -782,9 +828,9 @@ export function Wizard({
               {step === 4 && (
                 <StepDetails form={form} setForm={setForm} errors={errors} />
               )}
-              {step === 5 && service && member && slot && (
+              {step === 5 && selectedServices.length > 0 && member && slot && (
                 <StepConfirm
-                  payload={{ service, member, slot, ...form }}
+                  payload={{ services: selectedServices, member, slot, ...form }}
                   errorMsg={errorMsg}
                 />
               )}

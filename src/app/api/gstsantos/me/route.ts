@@ -12,5 +12,6 @@ export async function GET() {
     email: ctx.userEmail,
     role: ctx.role,
     canCreateServices: ctx.canCreateServices,
+    isBarber: ctx.isBarber,
   });
 }

@@ -4,18 +4,25 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createAuthClient } from "better-auth/client";
 import { useRouter } from "next/navigation";
+import {
+  CalendarDays,
+  CalendarClock,
+  DollarSign,
+  LogOut,
+  MessageCircle,
+  Package,
+  Scissors,
+  UserRound,
+  Users,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 const authClient = createAuthClient({ baseURL: typeof window !== "undefined" ? window.location.origin : "" });
 
-const BASE_NAV_ITEMS = [
-  { href: "/gstsantos/agenda", label: "Agenda", icon: "📅" },
-  { href: "/gstsantos/customers", label: "Clientes", icon: "👥" },
-  { href: "/gstsantos/financial", label: "Financeiro", icon: "💰" },
-  { href: "/gstsantos/services", label: "Serviços", icon: "✂️" },
-];
+type NavItem = { href: string; label: string; icon: LucideIcon };
 
 interface Props {
-  role: "owner" | "member";
+  role: "owner" | "member" | "receptionist";
   canManageBarbers: boolean;
   isBarber: boolean;
 }
@@ -24,14 +31,25 @@ export function SidebarNav({ role, canManageBarbers, isBarber }: Props) {
   const pathname = usePathname();
   const router = useRouter();
 
-  const items = [
-    ...BASE_NAV_ITEMS,
-    ...(isBarber ? [{ href: "/gstsantos/schedule", label: "Minha Agenda", icon: "🗓" }] : []),
+  const items: NavItem[] = [
+    { href: "/gstsantos/agenda", label: "Agenda", icon: CalendarDays },
+    { href: "/gstsantos/customers", label: "Clientes", icon: Users },
+    { href: "/gstsantos/financial", label: "Financeiro", icon: DollarSign },
+    // Recepcionista não gerencia serviços nem tem agenda própria
+    ...(role !== "receptionist"
+      ? [{ href: "/gstsantos/services", label: "Serviços", icon: Scissors }]
+      : []),
+    ...(isBarber
+      ? [{ href: "/gstsantos/schedule", label: "Minha Agenda", icon: CalendarClock }]
+      : []),
     ...(canManageBarbers
-      ? [{ href: "/gstsantos/barbers", label: "Barbeiros", icon: "👤" }]
+      ? [{ href: "/gstsantos/barbers", label: "Equipe", icon: UserRound }]
       : []),
     ...(role === "owner"
-      ? [{ href: "/gstsantos/whatsapp", label: "WhatsApp", icon: "💬" }]
+      ? [
+          { href: "/gstsantos/products", label: "Produtos", icon: Package },
+          { href: "/gstsantos/whatsapp", label: "WhatsApp", icon: MessageCircle },
+        ]
       : []),
   ];
 
@@ -41,6 +59,8 @@ export function SidebarNav({ role, canManageBarbers, isBarber }: Props) {
     router.replace("/gstsantos/login" as any);
   }
 
+  const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
+
   const linkStyle = (href: string): React.CSSProperties => ({
     display: "flex",
     alignItems: "center",
@@ -49,13 +69,11 @@ export function SidebarNav({ role, canManageBarbers, isBarber }: Props) {
     borderRadius: 8,
     textDecoration: "none",
     fontSize: 14,
-    fontWeight: pathname === href || pathname.startsWith(href) ? 600 : 400,
-    color: pathname === href || pathname.startsWith(href) ? "#C9A84C" : "#C8C2B4",
-    background:
-      pathname === href || pathname.startsWith(href)
-        ? "rgba(201,168,76,0.08)"
-        : "transparent",
+    fontWeight: isActive(href) ? 600 : 400,
+    color: isActive(href) ? "#C9A84C" : "#C8C2B4",
+    background: isActive(href) ? "rgba(201,168,76,0.08)" : "transparent",
     transition: "all 0.15s",
+    cursor: "pointer",
   });
 
   return (
@@ -106,13 +124,16 @@ export function SidebarNav({ role, canManageBarbers, isBarber }: Props) {
         </div>
 
         <nav style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
-          {items.map((item) => (
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            <Link key={item.href} href={item.href as any} style={linkStyle(item.href)}>
-              <span>{item.icon}</span>
-              {item.label}
-            </Link>
-          ))}
+          {items.map((item) => {
+            const Icon = item.icon;
+            return (
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              <Link key={item.href} href={item.href as any} style={linkStyle(item.href)}>
+                <Icon size={17} strokeWidth={isActive(item.href) ? 2.2 : 1.7} />
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
 
         <button
@@ -132,7 +153,7 @@ export function SidebarNav({ role, canManageBarbers, isBarber }: Props) {
             textAlign: "left",
           }}
         >
-          <span>🚪</span>
+          <LogOut size={17} strokeWidth={1.7} />
           Sair
         </button>
       </aside>
@@ -144,38 +165,47 @@ export function SidebarNav({ role, canManageBarbers, isBarber }: Props) {
           bottom: 0,
           left: 0,
           right: 0,
-          background: "#131211",
+          background: "rgba(19,18,17,0.92)",
+          backdropFilter: "blur(16px) saturate(1.3)",
+          WebkitBackdropFilter: "blur(16px) saturate(1.3)",
           borderTop: "1px solid #2A2620",
           display: "flex",
           justifyContent: "space-around",
-          padding: "8px 0 calc(8px + env(safe-area-inset-bottom))",
+          padding: "6px 0 calc(6px + env(safe-area-inset-bottom))",
           zIndex: 50,
         }}
         className="gst-bottom-nav"
       >
-        {items.map((item) => (
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          <Link
-            key={item.href}
-            href={item.href as any}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 3,
-              padding: "4px 8px",
-              color:
-                pathname === item.href || pathname.startsWith(item.href)
-                  ? "#C9A84C"
-                  : "#8A847A",
-              textDecoration: "none",
-              fontSize: 10,
-            }}
-          >
-            <span style={{ fontSize: 20 }}>{item.icon}</span>
-            {item.label}
-          </Link>
-        ))}
+        {items.slice(0, 5).map((item) => {
+          const Icon = item.icon;
+          const active = isActive(item.href);
+          return (
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            <Link
+              key={item.href}
+              href={item.href as any}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 3,
+                minWidth: 52,
+                minHeight: 48,
+                padding: "4px 8px",
+                borderRadius: 10,
+                color: active ? "#C9A84C" : "#8A847A",
+                background: active ? "rgba(201,168,76,0.08)" : "transparent",
+                textDecoration: "none",
+                fontSize: 10,
+                transition: "all 0.15s",
+              }}
+            >
+              <Icon size={20} strokeWidth={active ? 2.2 : 1.7} />
+              {item.label}
+            </Link>
+          );
+        })}
       </nav>
 
       <style>{`

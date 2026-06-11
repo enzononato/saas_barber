@@ -1,4 +1,4 @@
-import { and, eq, exists, gt, inArray, lt } from "drizzle-orm";
+import { and, eq, exists, gt, inArray, lt, ne } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { appointments } from "@/server/db/schema";
@@ -53,6 +53,7 @@ export async function getSlotsForProfessional(
   durationMinutes: number,
   date: string,
   timezone: string,
+  excludeAppointmentId?: string,
 ): Promise<Slot[]> {
   if (durationMinutes <= 0) return [];
 
@@ -121,6 +122,7 @@ export async function getSlotsForProfessional(
         inArray(appointments.status, ["SCHEDULED", "COMPLETED"]),
         lt(appointments.startsAt, dayEnd),
         gt(appointments.endsAt, dayStart),
+        ...(excludeAppointmentId ? [ne(appointments.id, excludeAppointmentId)] : []),
       ),
     );
 
@@ -144,6 +146,7 @@ export async function isProfessionalAvailableAt(
   startsAt: Date,
   endsAt: Date,
   timezone: string,
+  excludeAppointmentId?: string,
 ): Promise<boolean> {
   // Use local date (not UTC) to avoid off-by-one for late-night slots
   const date = startsAt.toLocaleDateString("sv-SE", { timeZone: timezone });
@@ -204,6 +207,7 @@ export async function isProfessionalAvailableAt(
         inArray(appointments.status, ["SCHEDULED", "COMPLETED"]),
         lt(appointments.startsAt, endsAt),
         gt(appointments.endsAt, startsAt),
+        ...(excludeAppointmentId ? [ne(appointments.id, excludeAppointmentId)] : []),
       ),
     )
     .limit(1);

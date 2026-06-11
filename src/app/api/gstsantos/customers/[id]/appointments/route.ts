@@ -21,8 +21,8 @@ export async function GET(
   const customer = await getCustomerById(ctx.orgId, id);
   if (!customer) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-  // Scope: barbeiro só vê appointments que ele atendeu
-  if (ctx.role !== "owner") {
+  // Scope: barbeiro só vê appointments que ele atendeu. Owner/recepcionista veem todos.
+  if (ctx.role === "member") {
     const [hasAccess] = await db
       .select({ ok: sql<number>`1` })
       .from(appointments)
@@ -37,7 +37,7 @@ export async function GET(
     if (!hasAccess) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  const scopeUserId = ctx.role === "owner" ? undefined : ctx.userId;
+  const scopeUserId = ctx.role === "member" ? ctx.userId : undefined;
   const rows = await getCustomerAppointments(
     ctx.orgId,
     customer.phone,

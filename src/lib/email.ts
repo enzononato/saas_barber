@@ -1,5 +1,27 @@
 import { env } from "./env";
 
+/**
+ * Convites de novos profissionais usam o fluxo de reset de senha do Better Auth.
+ * Para diferenciar o e-mail de boas-vindas do "esqueci minha senha", a rota de
+ * criação marca o e-mail aqui ANTES de chamar requestPasswordReset; o callback
+ * `sendResetPassword` consome a marca e escolhe o template certo.
+ * (Janela de 5 min — suficiente, pois a chamada é síncrona no mesmo processo.)
+ */
+const pendingInvites = new Map<string, number>();
+const INVITE_FLAG_TTL_MS = 5 * 60 * 1000;
+
+export function markInviteEmail(email: string): void {
+  pendingInvites.set(email.toLowerCase(), Date.now());
+}
+
+export function consumeInviteFlag(email: string): boolean {
+  const key = email.toLowerCase();
+  const ts = pendingInvites.get(key);
+  if (ts === undefined) return false;
+  pendingInvites.delete(key);
+  return Date.now() - ts < INVITE_FLAG_TTL_MS;
+}
+
 const BRAND_HEADER = `
   <div style="background:linear-gradient(180deg,#131211,#0B0B0B);padding:32px 28px;border-bottom:1px solid #2A2620;text-align:center;">
     <div style="width:48px;height:48px;border:1px solid #C9A84C;border-radius:50%;display:inline-grid;place-items:center;color:#C9A84C;font-size:22px;font-style:italic;font-family:Georgia,serif;">S</div>

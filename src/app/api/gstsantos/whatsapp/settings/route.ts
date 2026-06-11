@@ -11,6 +11,9 @@ const updateSchema = z.object({
   followUpDays: z.number().int().min(1).max(365).optional(),
   bookingTemplate: z.string().min(1).max(2000).optional(),
   followUpTemplate: z.string().min(1).max(2000).optional(),
+  reminderEnabled: z.boolean().optional(),
+  reminderHoursBefore: z.number().int().min(1).max(48).optional(),
+  reminderTemplate: z.string().min(1).max(2000).optional(),
 });
 
 export async function GET() {
@@ -33,6 +36,9 @@ export async function GET() {
       followUpDays: 30,
       bookingTemplate: WHATSAPP_DEFAULTS.bookingTemplate,
       followUpTemplate: WHATSAPP_DEFAULTS.followUpTemplate,
+      reminderEnabled: true,
+      reminderHoursBefore: 2,
+      reminderTemplate: WHATSAPP_DEFAULTS.reminderTemplate,
     });
   }
 
@@ -44,6 +50,9 @@ export async function GET() {
     followUpDays: row.followUpDays,
     bookingTemplate: row.bookingTemplate,
     followUpTemplate: row.followUpTemplate,
+    reminderEnabled: row.reminderEnabled,
+    reminderHoursBefore: row.reminderHoursBefore,
+    reminderTemplate: row.reminderTemplate,
   });
 }
 
@@ -85,6 +94,9 @@ export async function POST(req: Request) {
         ...(data.followUpDays !== undefined && { followUpDays: data.followUpDays }),
         ...(data.bookingTemplate !== undefined && { bookingTemplate: data.bookingTemplate }),
         ...(data.followUpTemplate !== undefined && { followUpTemplate: data.followUpTemplate }),
+        ...(data.reminderEnabled !== undefined && { reminderEnabled: data.reminderEnabled }),
+        ...(data.reminderHoursBefore !== undefined && { reminderHoursBefore: data.reminderHoursBefore }),
+        ...(data.reminderTemplate !== undefined && { reminderTemplate: data.reminderTemplate }),
         updatedAt: sql`now()`,
       },
     });

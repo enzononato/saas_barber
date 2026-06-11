@@ -6,3 +6,4 @@ export * from "./push";
 export * from "./whatsapp";
 export * from "./customers";
 export * from "./expenses";
+export * from "./products";
