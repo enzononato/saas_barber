@@ -28,8 +28,8 @@ export default async function GstLayout({ children }: { children: React.ReactNod
       <main
         style={{
           flex: 1,
-          paddingBottom: 80, // space for mobile bottom nav
-          overflowX: "hidden",
+          paddingBottom: 80,
+          minWidth: 0,
         }}
       >
         {children}

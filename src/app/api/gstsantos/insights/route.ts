@@ -179,7 +179,7 @@ export async function GET() {
         COALESCE(SUM(a.price_at_booking * COALESCE(bs.commission_pct, 0) / 100), 0)::text AS total_commission
       FROM appointments a
       INNER JOIN "user" u ON u.id = a.professional_id
-      LEFT JOIN member m ON m.user_id = u.id AND m.organization_id = a.organization_id
+      LEFT JOIN member m ON m."userId" = u.id AND m."organizationId" = a.organization_id
       LEFT JOIN barber_services bs ON bs.member_id = m.id AND bs.service_id = a.service_id
       WHERE a.organization_id = ${orgId}
         AND a.status = 'COMPLETED'
@@ -221,7 +221,7 @@ export async function GET() {
          - COALESCE(EXTRACT(EPOCH FROM (wh.break_end_time - wh.break_start_time)) / 60, 0))::int
          AS minutes_per_day
       FROM working_hours wh
-      INNER JOIN member m ON m.user_id = wh.professional_id AND m.organization_id = wh.organization_id
+      INNER JOIN member m ON m."userId" = wh.professional_id AND m."organizationId" = wh.organization_id
       WHERE wh.organization_id = ${orgId}
         AND m.is_barber = true
     `),
