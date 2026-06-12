@@ -401,7 +401,8 @@ function Location({ units }: { units: MapUnit[] }) {
 
   const located = units.filter((u) => u.lat != null && u.lng != null);
   const multi = located.length > 1;
-  const [activeId, setActiveId] = useState<string | null>(located[0]?.id ?? null);
+  // Começa sem seleção: visão padrão enquadra todas as unidades.
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   return (
     <section className="block" id="contato">

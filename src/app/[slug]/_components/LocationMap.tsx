@@ -37,6 +37,8 @@ export function LocationMap({ units, activeId, onSelect }: LocationMapProps) {
   onSelectRef.current = onSelect;
   const activeIdRef = useRef(activeId);
   activeIdRef.current = activeId;
+  // Marca o instante do clique num pino para o clique do mapa não desmarcar junto.
+  const pinClickAtRef = useRef(0);
 
   // Apenas unidades com coordenadas válidas entram no mapa.
   const geo = units.filter(
@@ -135,14 +137,20 @@ export function LocationMap({ units, activeId, onSelect }: LocationMapProps) {
           .addTo(map);
 
         // Clicar no pin seleciona; clicar de novo no mesmo desmarca (volta ao padrão).
-        dot.addEventListener("click", () =>
-          onSelectRef.current?.(activeIdRef.current === u.id ? null : u.id),
-        );
+        // Sem stopPropagation: o clique precisa subir até o wrapper p/ o MapLibre
+        // abrir/fechar o popup. O guard de tempo evita o deselect do map click.
+        dot.addEventListener("click", () => {
+          pinClickAtRef.current = Date.now();
+          onSelectRef.current?.(activeIdRef.current === u.id ? null : u.id);
+        });
         markersRef.current.set(u.id, marker);
       }
 
-      // Clicar numa área vazia do mapa desmarca a seleção.
-      map.on("click", () => onSelectRef.current?.(null));
+      // Clicar numa área vazia do mapa desmarca — ignora se veio de um pino.
+      map.on("click", () => {
+        if (Date.now() - pinClickAtRef.current < 350) return;
+        onSelectRef.current?.(null);
+      });
 
       // Enquadra todas as unidades na primeira visão.
       frameAll(map, geo, 0);
