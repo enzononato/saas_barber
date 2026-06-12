@@ -19,8 +19,8 @@ interface LocationMapProps {
   units: MapUnit[];
   /** Unidade destacada (sincroniza com a lista de unidades). */
   activeId?: string | null;
-  /** Disparado ao clicar num marcador. */
-  onSelect?: (id: string) => void;
+  /** Disparado ao selecionar (id) ou desmarcar (null) um marcador. */
+  onSelect?: (id: string | null) => void;
 }
 
 // Basemap dark gratuito do Carto — não exige API key.
@@ -35,6 +35,8 @@ export function LocationMap({ units, activeId, onSelect }: LocationMapProps) {
   const didFlyRef = useRef(false);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const activeIdRef = useRef(activeId);
+  activeIdRef.current = activeId;
 
   // Apenas unidades com coordenadas válidas entram no mapa.
   const geo = units.filter(
@@ -132,19 +134,18 @@ export function LocationMap({ units, activeId, onSelect }: LocationMapProps) {
           .setPopup(popup)
           .addTo(map);
 
-        dot.addEventListener("click", () => onSelectRef.current?.(u.id));
+        // Clicar no pin seleciona; clicar de novo no mesmo desmarca (volta ao padrão).
+        dot.addEventListener("click", () =>
+          onSelectRef.current?.(activeIdRef.current === u.id ? null : u.id),
+        );
         markersRef.current.set(u.id, marker);
       }
 
+      // Clicar numa área vazia do mapa desmarca a seleção.
+      map.on("click", () => onSelectRef.current?.(null));
+
       // Enquadra todas as unidades na primeira visão.
-      if (geo.length === 1) {
-        map.setCenter([geo[0].lng, geo[0].lat]);
-        map.setZoom(15);
-      } else {
-        const bounds = new maplibregl.LngLatBounds();
-        geo.forEach((u) => bounds.extend([u.lng, u.lat]));
-        map.fitBounds(bounds, { padding: 70, maxZoom: 14, duration: 0 });
-      }
+      frameAll(map, geo, 0);
     };
 
     init();
@@ -161,8 +162,9 @@ export function LocationMap({ units, activeId, onSelect }: LocationMapProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [units.map((u) => u.id).join(",")]);
 
-  // Destaca o pin ativo. Só voa até a unidade quando o usuário a seleciona —
-  // na primeira montagem mantém o enquadramento de todas as unidades.
+  // Destaca o pin ativo. Voa até a unidade quando selecionada; ao desmarcar
+  // (activeId null) volta a enquadrar todas as unidades (visão padrão).
+  // Na primeira montagem mantém o enquadramento inicial.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -177,6 +179,10 @@ export function LocationMap({ units, activeId, onSelect }: LocationMapProps) {
     if (activeId) {
       const u = geo.find((g) => g.id === activeId);
       if (u) map.flyTo({ center: [u.lng, u.lat], zoom: 15, duration: 700 });
+    } else {
+      // Desmarcou: fecha popups abertos e volta à visão padrão.
+      markersRef.current.forEach((marker) => marker.getPopup()?.remove());
+      frameAll(map, geo, 700);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
@@ -196,6 +202,22 @@ export function LocationMap({ units, activeId, onSelect }: LocationMapProps) {
       <div ref={containerRef} className="gst-map-canvas" />
     </div>
   );
+}
+
+/** Enquadra a visão padrão: centraliza 1 unidade ou abrange todas as filiais. */
+function frameAll(
+  map: maplibregl.Map,
+  geo: Array<{ lat: number; lng: number }>,
+  duration: number,
+) {
+  if (geo.length === 0) return;
+  if (geo.length === 1) {
+    map.flyTo({ center: [geo[0].lng, geo[0].lat], zoom: 15, duration });
+    return;
+  }
+  const bounds = new maplibregl.LngLatBounds();
+  geo.forEach((u) => bounds.extend([u.lng, u.lat]));
+  map.fitBounds(bounds, { padding: 70, maxZoom: 14, duration });
 }
 
 /** HTML do popup do marcador — foto (ou banner) + endereço + link de rota. */
