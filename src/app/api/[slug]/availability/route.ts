@@ -28,7 +28,7 @@ export async function GET(
     );
   }
 
-  const { memberId, serviceId, serviceIds, date } = parsed.data;
+  const { memberId, serviceId, serviceIds, date, unitId } = parsed.data;
 
   // Multi-serviço: soma a duração de todos os serviços selecionados
   const ids = serviceIds ? serviceIds.split(",") : [serviceId!];
@@ -50,7 +50,14 @@ export async function GET(
 
   const totalDuration = svcRows.reduce((sum, s) => sum + s.durationMinutes, 0);
 
-  const slots = await getAvailableSlots(org.id, memberId, totalDuration, date, org.timezone);
+  const slots = await getAvailableSlots(
+    org.id,
+    memberId,
+    totalDuration,
+    date,
+    org.timezone,
+    unitId,
+  );
 
   return NextResponse.json({
     slots: slots.map((s) => ({

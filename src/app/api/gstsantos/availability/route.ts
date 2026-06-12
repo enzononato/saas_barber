@@ -19,6 +19,7 @@ export async function GET(req: Request) {
   const professionalId = searchParams.get("professionalId");
   const serviceIdsParam = searchParams.get("serviceIds");
   const date = searchParams.get("date");
+  const unitId = searchParams.get("unitId");
 
   if (!professionalId || !serviceIdsParam || !date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return NextResponse.json({ error: "invalid_params" }, { status: 400 });
@@ -63,6 +64,8 @@ export async function GET(req: Request) {
     totalDuration,
     date,
     org?.timezone ?? "America/Sao_Paulo",
+    undefined,
+    unitId ?? undefined,
   );
 
   return NextResponse.json({

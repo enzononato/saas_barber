@@ -2,7 +2,8 @@ import { asc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { db } from "@/server/db";
-import { units } from "@/server/db/schema/units";
+import { services } from "@/server/db/schema/services";
+import { serviceUnits, units } from "@/server/db/schema/units";
 import { requireAuth } from "@/server/middleware/requireAuth";
 import { resolveGoogleMapsLink } from "@/server/services/google-maps";
 
@@ -108,6 +109,26 @@ export async function POST(req: Request) {
       position: nextPosition,
     })
     .returning();
+
+  // A nova unidade herda todos os serviços existentes com o preço base
+  // (o dono ajusta os preços por unidade depois na tela de Serviços).
+  const orgServices = await db
+    .select({ id: services.id, price: services.price, isActive: services.isActive })
+    .from(services)
+    .where(eq(services.organizationId, ctx.orgId));
+  if (orgServices.length > 0) {
+    await db
+      .insert(serviceUnits)
+      .values(
+        orgServices.map((s) => ({
+          serviceId: s.id,
+          unitId: created.id,
+          price: s.price,
+          isActive: s.isActive,
+        })),
+      )
+      .onConflictDoNothing({ target: [serviceUnits.serviceId, serviceUnits.unitId] });
+  }
 
   return NextResponse.json(created, { status: 201 });
 }

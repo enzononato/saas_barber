@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -6,6 +6,7 @@ import { db } from "@/server/db";
 import { appointments } from "@/server/db/schema/appointments";
 import { organization, user } from "@/server/db/schema/auth";
 import { services } from "@/server/db/schema/services";
+import { serviceUnits, units } from "@/server/db/schema/units";
 import { requireAuth } from "@/server/middleware/requireAuth";
 import {
   getUtcOffset,
@@ -26,6 +27,7 @@ export async function GET(req: Request) {
   const date = searchParams.get("date"); // YYYY-MM-DD
   const status = searchParams.get("status");
   const barberId = searchParams.get("barberId"); // userId
+  const unitId = searchParams.get("unitId"); // filtra por filial
 
   const conditions = [eq(appointments.organizationId, ctx.orgId)];
 
@@ -34,6 +36,10 @@ export async function GET(req: Request) {
     conditions.push(eq(appointments.professionalId, ctx.userId));
   } else if (barberId) {
     conditions.push(eq(appointments.professionalId, barberId));
+  }
+
+  if (unitId) {
+    conditions.push(eq(appointments.unitId, unitId));
   }
 
   if (date) {
@@ -65,6 +71,7 @@ export async function GET(req: Request) {
       id: appointments.id,
       professionalId: appointments.professionalId,
       professionalName: user.name,
+      unitId: appointments.unitId,
       serviceId: appointments.serviceId,
       serviceNameAtBooking: appointments.serviceNameAtBooking,
       customerName: appointments.customerName,
@@ -88,11 +95,31 @@ export async function GET(req: Request) {
 const createManualSchema = z.object({
   professionalId: z.string().min(1),
   serviceIds: z.array(z.string().uuid()).min(1).max(5),
+  unitId: z.string().uuid().optional(),
   startsAt: z.string().datetime(),
   clientName: z.string().min(1).max(200),
   clientPhone: z.string().min(8).max(20),
   notes: z.string().max(500).optional(),
 });
+
+/** Valida o unitId informado (deve pertencer à org) ou usa a primeira unidade. */
+async function resolveUnitId(orgId: string, unitIdParam: string | null): Promise<string | null> {
+  if (unitIdParam) {
+    const [u] = await db
+      .select({ id: units.id })
+      .from(units)
+      .where(and(eq(units.id, unitIdParam), eq(units.organizationId, orgId)))
+      .limit(1);
+    return u ? u.id : null;
+  }
+  const [first] = await db
+    .select({ id: units.id })
+    .from(units)
+    .where(and(eq(units.organizationId, orgId), eq(units.isActive, true)))
+    .orderBy(asc(units.position), asc(units.createdAt))
+    .limit(1);
+  return first ? first.id : null;
+}
 
 /**
  * Agendamento manual pelo painel (owner, recepcionista, barbeiro-admin
@@ -125,6 +152,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
+  const effectiveUnitId = await resolveUnitId(ctx.orgId, parsed.data.unitId ?? null);
+
   const svcRows = await db
     .select({
       id: services.id,
@@ -145,7 +174,25 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "service_not_found" }, { status: 404 });
   }
 
-  const ordered = serviceIds.map((id) => svcRows.find((s) => s.id === id)!);
+  // Preço por unidade (service_units) sobrescreve o preço base quando há.
+  const unitPriceMap = new Map<string, string>();
+  if (effectiveUnitId) {
+    const suRows = await db
+      .select({ serviceId: serviceUnits.serviceId, price: serviceUnits.price })
+      .from(serviceUnits)
+      .where(
+        and(
+          eq(serviceUnits.unitId, effectiveUnitId),
+          inArray(serviceUnits.serviceId, serviceIds),
+        ),
+      );
+    for (const r of suRows) unitPriceMap.set(r.serviceId, r.price);
+  }
+
+  const ordered = serviceIds.map((id) => {
+    const s = svcRows.find((x) => x.id === id)!;
+    return { ...s, price: unitPriceMap.get(id) ?? s.price };
+  });
   const totalDuration = ordered.reduce((sum, s) => sum + s.durationMinutes, 0);
   const totalPrice = ordered
     .reduce((sum, s) => sum + parseFloat(s.price), 0)
@@ -176,6 +223,8 @@ export async function POST(req: Request) {
     startsAt,
     endsAt,
     timezone,
+    undefined,
+    effectiveUnitId ?? undefined,
   );
   if (!available) {
     return NextResponse.json({ error: "slot_unavailable" }, { status: 409 });
@@ -192,6 +241,7 @@ export async function POST(req: Request) {
   const result = await createAppointment({
     orgId: ctx.orgId,
     professionalId,
+    unitId: effectiveUnitId,
     serviceId: ordered[0].id,
     serviceNameAtBooking: combinedName,
     priceAtBooking: totalPrice,

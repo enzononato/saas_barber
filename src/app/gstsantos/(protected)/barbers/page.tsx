@@ -11,7 +11,14 @@ interface Barber {
   role: "owner" | "member" | "receptionist";
   isBarber: boolean;
   hasWorkingHours: boolean;
+  unitIds: string[];
   createdAt: string;
+}
+
+interface UnitOption {
+  id: string;
+  name: string;
+  isActive: boolean;
 }
 
 interface Me {
@@ -57,15 +64,21 @@ export default function BarbersPage() {
   const [commissionRows, setCommissionRows] = useState<CommissionRow[]>([]);
   const [commissionsLoading, setCommissionsLoading] = useState(false);
   const [commissionsSaving, setCommissionsSaving] = useState(false);
+  const [units, setUnits] = useState<UnitOption[]>([]);
+  const [unitsBarber, setUnitsBarber] = useState<Barber | null>(null);
+  const [selectedUnitIds, setSelectedUnitIds] = useState<string[]>([]);
+  const [unitsSaving, setUnitsSaving] = useState(false);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const [bRes, mRes] = await Promise.all([
+    const [bRes, mRes, uRes] = await Promise.all([
       fetch("/api/gstsantos/barbers"),
       fetch("/api/gstsantos/me"),
+      fetch("/api/gstsantos/units"),
     ]);
     if (bRes.ok) setBarbers(await bRes.json());
     if (mRes.ok) setMe(await mRes.json());
+    if (uRes.ok) setUnits(await uRes.json());
     setLoading(false);
   }, []);
 
@@ -172,7 +185,36 @@ export default function BarbersPage() {
     );
   }
 
+  function openUnits(b: Barber) {
+    setUnitsBarber(b);
+    setSelectedUnitIds(b.unitIds ?? []);
+  }
+
+  function toggleUnit(unitId: string) {
+    setSelectedUnitIds((ids) =>
+      ids.includes(unitId) ? ids.filter((x) => x !== unitId) : [...ids, unitId],
+    );
+  }
+
+  async function saveUnits() {
+    if (!unitsBarber) return;
+    setUnitsSaving(true);
+    const res = await fetch(`/api/gstsantos/barbers/${unitsBarber.memberId}/units`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ unitIds: selectedUnitIds }),
+    });
+    setUnitsSaving(false);
+    if (res.ok) {
+      setUnitsBarber(null);
+      await fetchAll();
+    } else {
+      alert("Erro ao salvar unidades.");
+    }
+  }
+
   const canManage = me?.role === "owner";
+  const multiUnit = units.length > 1;
 
   return (
     <div className="gst-page" style={{ maxWidth: 800 }}>
@@ -305,6 +347,23 @@ export default function BarbersPage() {
                         }}
                       >
                         Comissões
+                      </button>
+                    )}
+
+                    {multiUnit && (
+                      <button
+                        onClick={() => openUnits(b)}
+                        style={{
+                          padding: "5px 12px",
+                          border: "1px solid #7DD3FC44",
+                          borderRadius: 999,
+                          background: "rgba(125,211,252,0.08)",
+                          color: "#7DD3FC",
+                          fontSize: 12,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Unidades ({b.unitIds?.length ?? 0})
                       </button>
                     )}
 
@@ -504,6 +563,85 @@ export default function BarbersPage() {
                 style={{ flex: 1 }}
               >
                 {commissionsSaving ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Units modal */}
+      {unitsBarber && (
+        <div className="gst-overlay" onClick={() => setUnitsBarber(null)}>
+          <div
+            className="gst-modal"
+            style={{ maxWidth: 400, padding: 28 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              style={{
+                margin: "0 0 6px",
+                color: "#F4EEDF",
+                fontSize: 19,
+                fontFamily: "'Playfair Display', serif",
+              }}
+            >
+              Unidades de {unitsBarber.name}
+            </h2>
+            <p style={{ margin: "0 0 18px", fontSize: 12.5, color: "#8A847A" }}>
+              Marque as filiais em que este profissional atende. Ele só aparece no
+              agendamento das unidades selecionadas.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {units.map((u) => {
+                const checked = selectedUnitIds.includes(u.id);
+                return (
+                  <label
+                    key={u.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "11px 14px",
+                      borderRadius: 10,
+                      border: `1px solid ${checked ? "#C9A84C" : "#2A2620"}`,
+                      background: checked ? "rgba(201,168,76,0.06)" : "transparent",
+                      cursor: "pointer",
+                      opacity: u.isActive ? 1 : 0.5,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleUnit(u.id)}
+                      style={{ accentColor: "#C9A84C", width: 16, height: 16 }}
+                    />
+                    <span style={{ color: "#F4EEDF", fontSize: 14 }}>{u.name}</span>
+                    {!u.isActive && (
+                      <span style={{ marginLeft: "auto", fontSize: 11, color: "#8A847A" }}>
+                        inativa
+                      </span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
+              <button
+                onClick={() => setUnitsBarber(null)}
+                className="gst-btn gst-btn-ghost"
+                style={{ flex: 1 }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => void saveUnits()}
+                disabled={unitsSaving}
+                className="gst-btn gst-btn-gold"
+                style={{ flex: 1 }}
+              >
+                {unitsSaving ? "Salvando..." : "Salvar"}
               </button>
             </div>
           </div>

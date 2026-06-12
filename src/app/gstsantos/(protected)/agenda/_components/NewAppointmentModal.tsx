@@ -53,6 +53,8 @@ function fmtPhoneBR(raw: string): string {
 export function NewAppointmentModal({ defaultDate, lockedProfessionalId, onCreated, onClose }: Props) {
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [units, setUnits] = useState<{ id: string; name: string }[]>([]);
+  const [unitId, setUnitId] = useState<string | null>(null);
   const [professionalId, setProfessionalId] = useState<string>(lockedProfessionalId ?? "");
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [date, setDate] = useState(defaultDate);
@@ -67,12 +69,13 @@ export function NewAppointmentModal({ defaultDate, lockedProfessionalId, onCreat
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Carrega barbeiros + serviços
+  // Carrega barbeiros + serviços + unidades
   useEffect(() => {
     void (async () => {
-      const [bRes, sRes] = await Promise.all([
+      const [bRes, sRes, uRes] = await Promise.all([
         fetch("/api/gstsantos/barbers"),
         fetch("/api/gstsantos/services"),
+        fetch("/api/gstsantos/units"),
       ]);
       if (bRes.ok) {
         const rows = (await bRes.json()) as Barber[];
@@ -81,6 +84,11 @@ export function NewAppointmentModal({ defaultDate, lockedProfessionalId, onCreat
       if (sRes.ok) {
         const rows = (await sRes.json()) as Service[];
         setServices(rows.filter((s) => s.isActive));
+      }
+      if (uRes.ok) {
+        const us = (await uRes.json()) as { id: string; name: string }[];
+        setUnits(us);
+        if (us.length > 0) setUnitId(us[0].id);
       }
     })();
   }, []);
@@ -118,7 +126,7 @@ export function NewAppointmentModal({ defaultDate, lockedProfessionalId, onCreat
     setLoadingSlots(true);
     setSelectedSlot(null);
     const res = await fetch(
-      `/api/gstsantos/availability?professionalId=${professionalId}&serviceIds=${selectedServiceIds.join(",")}&date=${date}`,
+      `/api/gstsantos/availability?professionalId=${professionalId}&serviceIds=${selectedServiceIds.join(",")}&date=${date}${unitId ? `&unitId=${unitId}` : ""}`,
     );
     if (res.ok) {
       const data = await res.json();
@@ -127,7 +135,7 @@ export function NewAppointmentModal({ defaultDate, lockedProfessionalId, onCreat
       setSlots([]);
     }
     setLoadingSlots(false);
-  }, [professionalId, selectedServiceIds, date]);
+  }, [professionalId, selectedServiceIds, date, unitId]);
 
   useEffect(() => { void fetchSlots(); }, [fetchSlots]);
 
@@ -168,6 +176,7 @@ export function NewAppointmentModal({ defaultDate, lockedProfessionalId, onCreat
         clientName: clientName.trim(),
         clientPhone,
         notes: notes.trim() || undefined,
+        ...(unitId ? { unitId } : {}),
       }),
     });
 
@@ -312,6 +321,37 @@ export function NewAppointmentModal({ defaultDate, lockedProfessionalId, onCreat
           placeholder="(74) 99999-9999"
           style={{ ...inputStyle, marginBottom: 18 }}
         />
+
+        {/* Unidade — quando há mais de uma */}
+        {units.length > 1 && (
+          <>
+            <p style={sectionLabel}>Unidade</p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
+              {units.map((u) => {
+                const sel = unitId === u.id;
+                return (
+                  <button
+                    key={u.id}
+                    onClick={() => setUnitId(u.id)}
+                    style={{
+                      padding: "9px 16px",
+                      minHeight: 40,
+                      borderRadius: 999,
+                      border: `1px solid ${sel ? "#C9A84C" : "#2A2620"}`,
+                      background: sel ? "rgba(201,168,76,0.12)" : "transparent",
+                      color: sel ? "#C9A84C" : "#C8C2B4",
+                      fontSize: 13,
+                      fontWeight: sel ? 600 : 400,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {u.name}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
 
         {/* Profissional */}
         {!lockedProfessionalId && (

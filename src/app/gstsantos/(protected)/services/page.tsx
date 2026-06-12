@@ -3,6 +3,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { Plus } from "lucide-react";
 
+interface UnitPrice {
+  unitId: string;
+  price: string;
+  isActive: boolean;
+}
+
 interface Service {
   id: string;
   name: string;
@@ -11,6 +17,13 @@ interface Service {
   price: string;
   isActive: boolean;
   isAttached: boolean | null;
+  unitPrices: UnitPrice[];
+}
+
+interface UnitOption {
+  id: string;
+  name: string;
+  isActive: boolean;
 }
 
 interface Me {
@@ -29,6 +42,17 @@ function fmtDuration(min: number) {
   return m === 0 ? `${h}h` : `${h}h ${m}min`;
 }
 
+// Em multi-unidade, mostra a faixa de preços (menor–maior) entre as filiais.
+function priceLabel(svc: Service, multiUnit: boolean): string {
+  if (!multiUnit || !svc.unitPrices || svc.unitPrices.length === 0) {
+    return fmtR$(svc.price);
+  }
+  const prices = svc.unitPrices.map((u) => parseFloat(u.price));
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  return min === max ? fmtR$(String(min)) : `${fmtR$(String(min))} – ${fmtR$(String(max))}`;
+}
+
 type ModalMode = "create" | "edit";
 
 interface FormState {
@@ -36,13 +60,22 @@ interface FormState {
   description: string;
   durationMinutes: string;
   price: string;
+  /** Preço por unidade (unitId → preço em string). */
+  unitPrices: Record<string, string>;
 }
 
-const DEFAULT_FORM: FormState = { name: "", description: "", durationMinutes: "30", price: "0" };
+const DEFAULT_FORM: FormState = {
+  name: "",
+  description: "",
+  durationMinutes: "30",
+  price: "0",
+  unitPrices: {},
+};
 
 export default function ServicesPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [me, setMe] = useState<Me | null>(null);
+  const [units, setUnits] = useState<UnitOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<{ mode: ModalMode; svc?: Service } | null>(null);
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
@@ -50,41 +83,69 @@ export default function ServicesPage() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const [svcRes, meRes] = await Promise.all([
+    const [svcRes, meRes, uRes] = await Promise.all([
       fetch("/api/gstsantos/services"),
       fetch("/api/gstsantos/me"),
+      fetch("/api/gstsantos/units"),
     ]);
     if (svcRes.ok) setServices(await svcRes.json());
     if (meRes.ok) setMe(await meRes.json());
+    if (uRes.ok) setUnits(await uRes.json());
     setLoading(false);
   }, []);
 
   useEffect(() => { void fetchAll(); }, [fetchAll]);
 
   const canManageServices = me?.role === "owner" || me?.canCreateServices;
+  const multiUnit = units.length > 1;
 
   function openCreate() {
-    setForm(DEFAULT_FORM);
+    // Em multi-unidade, inicializa cada unidade com o preço base padrão.
+    const unitPrices: Record<string, string> = {};
+    if (multiUnit) units.forEach((u) => (unitPrices[u.id] = "0"));
+    setForm({ ...DEFAULT_FORM, unitPrices });
     setModal({ mode: "create" });
   }
 
   function openEdit(svc: Service) {
+    const unitPrices: Record<string, string> = {};
+    if (multiUnit) {
+      units.forEach((u) => {
+        const up = svc.unitPrices?.find((p) => p.unitId === u.id);
+        unitPrices[u.id] = up ? up.price : svc.price;
+      });
+    }
     setForm({
       name: svc.name,
       description: svc.description ?? "",
       durationMinutes: String(svc.durationMinutes),
       price: svc.price,
+      unitPrices,
     });
     setModal({ mode: "edit", svc });
   }
 
   async function handleSave() {
     setSaving(true);
+
+    // Preço base: em multi-unidade, usa o menor preço entre as unidades como
+    // referência; em unidade única, usa o campo de preço direto.
+    const unitPricesArr = multiUnit
+      ? units.map((u) => ({
+          unitId: u.id,
+          price: parseFloat(form.unitPrices[u.id] || "0").toFixed(2),
+        }))
+      : [];
+    const basePrice = multiUnit
+      ? Math.min(...unitPricesArr.map((u) => parseFloat(u.price))).toFixed(2)
+      : parseFloat(form.price).toFixed(2);
+
     const body = {
       name: form.name,
       description: form.description || null,
       durationMinutes: parseInt(form.durationMinutes),
-      price: parseFloat(form.price).toFixed(2),
+      price: basePrice,
+      ...(multiUnit ? { unitPrices: unitPricesArr } : {}),
     };
 
     if (modal?.mode === "create") {
@@ -186,7 +247,7 @@ export default function ServicesPage() {
 
               <div style={{ display: "flex", gap: 16, marginTop: 10 }}>
                 <span style={{ color: "#C9A84C", fontWeight: 600, fontSize: 14 }}>
-                  {fmtR$(svc.price)}
+                  {priceLabel(svc, multiUnit)}
                 </span>
                 <span style={{ color: "#8A847A", fontSize: 13 }}>
                   {fmtDuration(svc.durationMinutes)}
@@ -275,16 +336,50 @@ export default function ServicesPage() {
                 className="gst-input" style={{ width: "100%" }}
               />
             </Field>
-            <Field label="Preço (R$)">
-              <input
-                type="number"
-                min={0}
-                step={0.01}
-                value={form.price}
-                onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-                className="gst-input" style={{ width: "100%" }}
-              />
-            </Field>
+            {multiUnit ? (
+              <Field label="Preço por unidade (R$)">
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {units.map((u) => (
+                    <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span
+                        style={{
+                          flex: 1,
+                          fontSize: 13,
+                          color: u.isActive ? "#C8C2B4" : "#8A847A",
+                        }}
+                      >
+                        {u.name}
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        value={form.unitPrices[u.id] ?? "0"}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            unitPrices: { ...f.unitPrices, [u.id]: e.target.value },
+                          }))
+                        }
+                        className="gst-input"
+                        style={{ width: 110 }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </Field>
+            ) : (
+              <Field label="Preço (R$)">
+                <input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={form.price}
+                  onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+                  className="gst-input" style={{ width: "100%" }}
+                />
+              </Field>
+            )}
 
             <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
               <button onClick={() => setModal(null)} className="gst-btn gst-btn-ghost" style={{ flex: 1 }}>

@@ -7,6 +7,7 @@ import { markInviteEmail } from "@/lib/email";
 import { db } from "@/server/db";
 import { member, user } from "@/server/db/schema/auth";
 import { workingHours } from "@/server/db/schema/availability";
+import { memberUnits, units } from "@/server/db/schema/units";
 import { requireAuth } from "@/server/middleware/requireAuth";
 import { getOrgBySlug } from "@/server/services/tenant";
 
@@ -28,7 +29,21 @@ export async function GET() {
     .innerJoin(user, eq(member.userId, user.id))
     .where(eq(member.organizationId, ctx.orgId));
 
-  // Enrich with hasWorkingHours flag
+  // Vínculos membro→unidades de toda a org (uma query, depois agrupado em memória).
+  const links = await db
+    .select({ memberId: memberUnits.memberId, unitId: memberUnits.unitId })
+    .from(memberUnits)
+    .innerJoin(member, eq(memberUnits.memberId, member.id))
+    .where(eq(member.organizationId, ctx.orgId));
+
+  const unitsByMember = new Map<string, string[]>();
+  for (const l of links) {
+    const arr = unitsByMember.get(l.memberId) ?? [];
+    arr.push(l.unitId);
+    unitsByMember.set(l.memberId, arr);
+  }
+
+  // Enrich with hasWorkingHours flag + unitIds
   const enriched = await Promise.all(
     rows.map(async (row) => {
       const [wh] = await db
@@ -41,7 +56,11 @@ export async function GET() {
           ),
         )
         .limit(1);
-      return { ...row, hasWorkingHours: Boolean(wh) };
+      return {
+        ...row,
+        hasWorkingHours: Boolean(wh),
+        unitIds: unitsByMember.get(row.memberId) ?? [],
+      };
     }),
   );
 
@@ -107,6 +126,25 @@ export async function POST(req: Request) {
     canCreateServices: false,
     createdAt: new Date(),
   });
+
+  // Vincula o novo membro às unidades informadas, ou a todas as ativas por padrão
+  // (evita barbeiro órfão que não apareceria em nenhuma filial).
+  const requestedUnitIds = Array.isArray(body.unitIds) ? (body.unitIds as string[]) : null;
+  const targetUnitIds =
+    requestedUnitIds && requestedUnitIds.length > 0
+      ? requestedUnitIds
+      : (
+          await db
+            .select({ id: units.id })
+            .from(units)
+            .where(and(eq(units.organizationId, org.id), eq(units.isActive, true)))
+        ).map((u) => u.id);
+  if (targetUnitIds.length > 0) {
+    await db
+      .insert(memberUnits)
+      .values(targetUnitIds.map((unitId) => ({ memberId, unitId })))
+      .onConflictDoNothing({ target: [memberUnits.memberId, memberUnits.unitId] });
+  }
 
   const setupPage = `${(env.BETTER_AUTH_URL ?? "").replace(/\/$/, "")}/gstsantos/reset-password`;
   try {

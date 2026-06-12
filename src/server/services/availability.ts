@@ -4,6 +4,7 @@ import { db } from "@/server/db";
 import { appointments } from "@/server/db/schema";
 import { member } from "@/server/db/schema/auth";
 import { timeExceptions, workingHours } from "@/server/db/schema/availability";
+import { memberUnits } from "@/server/db/schema/units";
 
 export interface Slot {
   startsAt: Date;
@@ -54,6 +55,7 @@ export async function getSlotsForProfessional(
   date: string,
   timezone: string,
   excludeAppointmentId?: string,
+  unitId?: string,
 ): Promise<Slot[]> {
   if (durationMinutes <= 0) return [];
 
@@ -75,6 +77,8 @@ export async function getSlotsForProfessional(
         eq(workingHours.organizationId, orgId),
         eq(workingHours.professionalId, professionalId),
         eq(workingHours.dayOfWeek, dayOfWeek),
+        // Horários são por unidade; o "ocupado" (abaixo) permanece global.
+        unitId ? eq(workingHours.unitId, unitId) : undefined,
       ),
     )
     .limit(1);
@@ -147,6 +151,7 @@ export async function isProfessionalAvailableAt(
   endsAt: Date,
   timezone: string,
   excludeAppointmentId?: string,
+  unitId?: string,
 ): Promise<boolean> {
   // Use local date (not UTC) to avoid off-by-one for late-night slots
   const date = startsAt.toLocaleDateString("sv-SE", { timeZone: timezone });
@@ -166,6 +171,7 @@ export async function isProfessionalAvailableAt(
         eq(workingHours.organizationId, orgId),
         eq(workingHours.professionalId, professionalId),
         eq(workingHours.dayOfWeek, dayOfWeek),
+        unitId ? eq(workingHours.unitId, unitId) : undefined,
       ),
     )
     .limit(1);
@@ -221,17 +227,42 @@ export async function getAvailableSlots(
   durationMinutes: number,
   date: string,
   timezone: string,
+  unitId?: string,
 ): Promise<Slot[]> {
   if (memberId !== "any") {
-    return getSlotsForProfessional(orgId, memberId, durationMinutes, date, timezone);
+    return getSlotsForProfessional(
+      orgId,
+      memberId,
+      durationMinutes,
+      date,
+      timezone,
+      undefined,
+      unitId,
+    );
   }
 
+  // "Sem preferência": profissionais com horário na unidade (e, se houver
+  // unidade, que estejam vinculados a ela em member_units).
   const professionals = await db
     .select({ userId: member.userId })
     .from(member)
     .where(
       and(
         eq(member.organizationId, orgId),
+        unitId
+          ? exists(
+              db
+                .select({ id: memberUnits.id })
+                .from(memberUnits)
+                .where(
+                  and(
+                    eq(memberUnits.memberId, member.id),
+                    eq(memberUnits.unitId, unitId),
+                  ),
+                )
+                .limit(1),
+            )
+          : undefined,
         exists(
           db
             .select({ id: workingHours.id })
@@ -240,6 +271,7 @@ export async function getAvailableSlots(
               and(
                 eq(workingHours.organizationId, orgId),
                 eq(workingHours.professionalId, member.userId),
+                unitId ? eq(workingHours.unitId, unitId) : undefined,
               ),
             )
             .limit(1),
@@ -249,7 +281,15 @@ export async function getAvailableSlots(
 
   const slotMap = new Map<number, Slot>();
   for (const p of professionals) {
-    const slots = await getSlotsForProfessional(orgId, p.userId, durationMinutes, date, timezone);
+    const slots = await getSlotsForProfessional(
+      orgId,
+      p.userId,
+      durationMinutes,
+      date,
+      timezone,
+      undefined,
+      unitId,
+    );
     for (const s of slots) {
       slotMap.set(s.startsAt.getTime(), s);
     }

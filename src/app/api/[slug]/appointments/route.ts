@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { services } from "@/server/db/schema";
 import { user } from "@/server/db/schema/auth";
+import { serviceUnits, units } from "@/server/db/schema/units";
 import { env } from "@/lib/env";
 import { createAppointmentSchema } from "@/lib/validators/booking";
 import {
@@ -49,6 +50,9 @@ export async function POST(
   const { memberId, startsAt: startsAtStr, clientName, notes } = parsed.data;
   const normalizedPhone = normalizePhoneBR(parsed.data.clientPhone);
 
+  // Resolve a unidade: usa a informada (validando a org) ou a primeira da org.
+  const effectiveUnitId = await resolveUnitId(org.id, parsed.data.unitId ?? null);
+
   // Multi-serviço: 1+ serviços somam duração e preço
   const serviceIds = parsed.data.serviceIds ?? [parsed.data.serviceId!];
 
@@ -72,8 +76,26 @@ export async function POST(
     return NextResponse.json({ error: "service_not_found" }, { status: 404 });
   }
 
-  // Preserva a ordem escolhida pelo cliente
-  const ordered = serviceIds.map((id) => svcRows.find((s) => s.id === id)!);
+  // Preço por unidade: sobrescreve o preço base quando há service_units.
+  const unitPriceMap = new Map<string, string>();
+  if (effectiveUnitId) {
+    const suRows = await db
+      .select({ serviceId: serviceUnits.serviceId, price: serviceUnits.price })
+      .from(serviceUnits)
+      .where(
+        and(
+          eq(serviceUnits.unitId, effectiveUnitId),
+          inArray(serviceUnits.serviceId, serviceIds),
+        ),
+      );
+    for (const r of suRows) unitPriceMap.set(r.serviceId, r.price);
+  }
+
+  // Preserva a ordem escolhida pelo cliente; aplica preço da unidade quando houver.
+  const ordered = serviceIds.map((id) => {
+    const s = svcRows.find((x) => x.id === id)!;
+    return { ...s, price: unitPriceMap.get(id) ?? s.price };
+  });
   const totalDuration = ordered.reduce((sum, s) => sum + s.durationMinutes, 0);
   const totalPrice = ordered
     .reduce((sum, s) => sum + parseFloat(s.price), 0)
@@ -111,6 +133,7 @@ export async function POST(
     clientPhone: normalizedPhone,
     notes,
     serviceItems,
+    unitId: effectiveUnitId,
   };
 
   // Para barbeiro específico, validar working_hours/exceptions antes do INSERT
@@ -122,6 +145,8 @@ export async function POST(
       startsAt,
       endsAt,
       org.timezone,
+      undefined,
+      effectiveUnitId ?? undefined,
     );
     if (!available) {
       return NextResponse.json({ error: "slot_unavailable" }, { status: 409 });
@@ -130,7 +155,7 @@ export async function POST(
 
   const result =
     memberId === "any"
-      ? await createAppointmentForAny(org.id, appointmentParams, org.timezone)
+      ? await createAppointmentForAny(org.id, appointmentParams, org.timezone, effectiveUnitId)
       : await createAppointment({ ...appointmentParams, orgId: org.id, professionalId: memberId });
 
   if (!result.ok) {
@@ -169,6 +194,25 @@ export async function POST(
 function buildManageUrl(slug: string, appointmentId: string): string {
   const base = (env.BETTER_AUTH_URL ?? "").replace(/\/$/, "");
   return `${base}/${slug}/agendamentos/${appointmentId}/gerenciar`;
+}
+
+/** Valida o unitId informado (deve pertencer à org) ou usa a primeira unidade. */
+async function resolveUnitId(orgId: string, unitIdParam: string | null): Promise<string | null> {
+  if (unitIdParam) {
+    const [u] = await db
+      .select({ id: units.id })
+      .from(units)
+      .where(and(eq(units.id, unitIdParam), eq(units.organizationId, orgId)))
+      .limit(1);
+    return u ? u.id : null;
+  }
+  const [first] = await db
+    .select({ id: units.id })
+    .from(units)
+    .where(and(eq(units.organizationId, orgId), eq(units.isActive, true)))
+    .orderBy(asc(units.position), asc(units.createdAt))
+    .limit(1);
+  return first ? first.id : null;
 }
 
 type NotifyParams = {

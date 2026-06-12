@@ -58,6 +58,8 @@ export default function AgendaPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [checkoutFor, setCheckoutFor] = useState<Appointment | null>(null);
+  const [units, setUnits] = useState<{ id: string; name: string }[]>([]);
+  const [unitFilter, setUnitFilter] = useState<string>("all");
 
   useEffect(() => {
     const t = setTimeout(() => setSearchQuery(searchInput.trim()), 300);
@@ -68,16 +70,20 @@ export default function AgendaPage() {
     void (async () => {
       const res = await fetch("/api/gstsantos/me");
       if (res.ok) setMe(await res.json());
+      const uRes = await fetch("/api/gstsantos/units");
+      if (uRes.ok) setUnits(await uRes.json());
     })();
   }, []);
 
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
-    const url = `/api/gstsantos/appointments?date=${date}`;
+    const url =
+      `/api/gstsantos/appointments?date=${date}` +
+      (unitFilter !== "all" ? `&unitId=${unitFilter}` : "");
     const res = await fetch(url);
     if (res.ok) setAppointments(await res.json());
     setLoading(false);
-  }, [date]);
+  }, [date, unitFilter]);
 
   useEffect(() => { void fetchAppointments(); }, [fetchAppointments]);
 
@@ -163,6 +169,30 @@ export default function AgendaPage() {
           style={{ fontSize: 13 }}
         />
       </div>
+
+      {/* Unit filter — quando há mais de uma unidade */}
+      {units.length > 1 && (
+        <div
+          className="gst-tabs"
+          style={{ marginBottom: 12, flexWrap: "wrap" }}
+        >
+          <button
+            onClick={() => setUnitFilter("all")}
+            className={`gst-tab${unitFilter === "all" ? " on" : ""}`}
+          >
+            Todas as unidades
+          </button>
+          {units.map((u) => (
+            <button
+              key={u.id}
+              onClick={() => setUnitFilter(u.id)}
+              className={`gst-tab${unitFilter === u.id ? " on" : ""}`}
+            >
+              {u.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* View tabs */}
       <div className="gst-tabs" style={{ marginBottom: 20 }}>

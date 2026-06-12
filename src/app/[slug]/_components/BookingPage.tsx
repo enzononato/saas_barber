@@ -500,23 +500,65 @@ export function BookingPage({
   teamMembers,
   units,
 }: BookingPageProps) {
+  const multiUnit = units.length > 1;
+
   const [wizardOpen, setWizardOpen] = useState(false);
   const [presetService, setPresetService] = useState<Service | null>(null);
+  const [unitPickerOpen, setUnitPickerOpen] = useState(false);
+  const [bookingUnitId, setBookingUnitId] = useState<string | null>(
+    units.length === 1 ? units[0].id : null,
+  );
+  const [wizardServices, setWizardServices] = useState<Service[]>(initialServices);
+  const [wizardMembers, setWizardMembers] = useState<Member[]>(initialMembers);
+  const [loadingUnitData, setLoadingUnitData] = useState(false);
 
   useEffect(() => {
-    document.body.style.overflow = wizardOpen ? "hidden" : "";
+    document.body.style.overflow = wizardOpen || unitPickerOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
-  }, [wizardOpen]);
+  }, [wizardOpen, unitPickerOpen]);
+
+  async function loadUnitData(unitId: string): Promise<Service[]> {
+    setLoadingUnitData(true);
+    let svcs: Service[] = [];
+    try {
+      const [sRes, mRes] = await Promise.all([
+        fetch(`/api/${slug}/services?unitId=${unitId}`),
+        fetch(`/api/${slug}/members?unitId=${unitId}`),
+      ]);
+      if (sRes.ok) svcs = (await sRes.json()).services ?? [];
+      if (mRes.ok) setWizardMembers((await mRes.json()).members ?? []);
+      setWizardServices(svcs);
+    } finally {
+      setLoadingUnitData(false);
+    }
+    return svcs;
+  }
 
   const openWizard = (svc?: Service) => {
     setPresetService(svc ?? null);
+    // Multi-unidade: primeiro escolhe a filial.
+    if (multiUnit && !bookingUnitId) {
+      setUnitPickerOpen(true);
+      return;
+    }
     setWizardOpen(true);
   };
+
+  async function chooseUnit(unitId: string) {
+    setBookingUnitId(unitId);
+    setUnitPickerOpen(false);
+    const svcs = await loadUnitData(unitId);
+    // Re-mapeia o serviço pré-selecionado para o preço da unidade.
+    setPresetService((prev) => (prev ? svcs.find((s) => s.id === prev.id) ?? null : null));
+    setWizardOpen(true);
+  }
 
   const closeWizard = () => {
     setWizardOpen(false);
     setTimeout(() => setPresetService(null), 450);
   };
+
+  const useUnitData = multiUnit && bookingUnitId;
 
   return (
     <>
@@ -540,15 +582,62 @@ export function BookingPage({
         </button>
       </div>
 
+      {unitPickerOpen && (
+        <div className="gst-overlay" style={{ zIndex: 200 }} onClick={() => setUnitPickerOpen(false)}>
+          <div
+            className="gst-modal"
+            style={{ maxWidth: 440, padding: 28 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3
+              style={{
+                margin: "0 0 6px",
+                color: "var(--paper)",
+                fontSize: 22,
+                fontFamily: "'Playfair Display', serif",
+              }}
+            >
+              Escolha a unidade
+            </h3>
+            <p style={{ margin: "0 0 18px", fontSize: 13.5, color: "var(--paper-dim)" }}>
+              Em qual unidade você quer agendar?
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {units.map((u) => (
+                <button
+                  key={u.id}
+                  type="button"
+                  className="unit-item"
+                  disabled={loadingUnitData}
+                  onClick={() => void chooseUnit(u.id)}
+                >
+                  <Icons.Pin style={{ width: 18, height: 18, color: "var(--gold)", flexShrink: 0 }} />
+                  <span className="unit-text">
+                    <span className="unit-name">{u.name}</span>
+                    {u.address && <span className="unit-addr">{u.address}</span>}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {loadingUnitData && (
+              <p style={{ margin: "14px 0 0", fontSize: 12, color: "var(--gold)", textAlign: "center" }}>
+                Carregando…
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       <Wizard
         slug={slug}
         open={wizardOpen}
         onClose={closeWizard}
-        services={initialServices}
-        members={initialMembers}
-        loadingServices={false}
-        loadingMembers={false}
+        services={useUnitData ? wizardServices : initialServices}
+        members={useUnitData ? wizardMembers : initialMembers}
+        loadingServices={loadingUnitData}
+        loadingMembers={loadingUnitData}
         presetService={presetService}
+        unitId={bookingUnitId}
       />
     </>
   );

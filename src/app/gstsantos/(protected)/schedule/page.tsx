@@ -83,6 +83,8 @@ export default function SchedulePage() {
   const [me, setMe] = useState<Me | null>(null);
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [selectedProfId, setSelectedProfId] = useState<string | null>(null);
+  const [units, setUnits] = useState<{ id: string; name: string }[]>([]);
+  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
 
   const [hours, setHours] = useState<Record<number, DayState>>({});
   const [exceptions, setExceptions] = useState<TimeException[]>([]);
@@ -92,7 +94,7 @@ export default function SchedulePage() {
   const [exForm, setExForm] = useState({ startsAt: "", endsAt: "", reason: "" });
   const [addingEx, setAddingEx] = useState(false);
 
-  // Phase 1: fetch identity + barbers list (owner only)
+  // Phase 1: fetch identity + barbers list (owner only) + units
   useEffect(() => {
     async function init() {
       const meRes = await fetch("/api/gstsantos/me");
@@ -105,23 +107,35 @@ export default function SchedulePage() {
         const barbRes = await fetch("/api/gstsantos/barbers");
         if (barbRes.ok) setBarbers(await barbRes.json());
       }
+
+      const uRes = await fetch("/api/gstsantos/units");
+      if (uRes.ok) {
+        const us = (await uRes.json()) as { id: string; name: string }[];
+        setUnits(us);
+        if (us.length > 0) setSelectedUnitId(us[0].id);
+      }
     }
     void init();
   }, []);
 
-  // Phase 2: fetch schedule data whenever selected professional changes
+  // Phase 2: fetch schedule data whenever selected professional/unit changes
   const fetchAll = useCallback(async () => {
     if (!selectedProfId || !me) return;
     setLoading(true);
-    const qs = me.role === "owner" ? `?professionalId=${selectedProfId}` : "";
+    const params = new URLSearchParams();
+    if (me.role === "owner") params.set("professionalId", selectedProfId);
+    if (selectedUnitId) params.set("unitId", selectedUnitId);
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    // time-exceptions são por profissional (folga vale para todas as unidades)
+    const exParams = me.role === "owner" ? `?professionalId=${selectedProfId}` : "";
     const [whRes, exRes] = await Promise.all([
       fetch(`/api/gstsantos/working-hours${qs}`),
-      fetch(`/api/gstsantos/time-exceptions${qs}`),
+      fetch(`/api/gstsantos/time-exceptions${exParams}`),
     ]);
     if (whRes.ok) setHours(buildDayMap(await whRes.json()));
     if (exRes.ok) setExceptions(await exRes.json());
     setLoading(false);
-  }, [selectedProfId, me]);
+  }, [selectedProfId, selectedUnitId, me]);
 
   useEffect(() => { void fetchAll(); }, [fetchAll]);
 
@@ -160,6 +174,7 @@ export default function SchedulePage() {
       body: JSON.stringify({
         hours: hoursArr,
         ...(me.role === "owner" ? { professionalId: selectedProfId } : {}),
+        ...(selectedUnitId ? { unitId: selectedUnitId } : {}),
       }),
     });
     setSaving(false);
@@ -215,6 +230,25 @@ export default function SchedulePage() {
       <div className="gst-head" style={{ marginBottom: 20 }}>
         <h1 className="gst-title">{pageTitle}</h1>
       </div>
+
+      {/* Unit selector — quando há mais de uma unidade */}
+      {units.length > 1 && (
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ ...labelStyle, marginBottom: 6, display: "block" }}>
+            Horários na unidade
+          </label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {units.map((u) => (
+              <ProfButton
+                key={u.id}
+                active={selectedUnitId === u.id}
+                onClick={() => setSelectedUnitId(u.id)}
+                label={u.name}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Barber selector — owner only */}
       {isOwner && barbers.length > 0 && (

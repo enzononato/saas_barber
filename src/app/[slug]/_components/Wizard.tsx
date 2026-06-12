@@ -30,6 +30,7 @@ interface WizardProps {
   loadingServices: boolean;
   loadingMembers: boolean;
   presetService: Service | null;
+  unitId?: string | null;
 }
 
 const fmtPrice = (price: string | number) =>
@@ -214,6 +215,7 @@ function StepDateAndTime({
   slug,
   memberId,
   serviceIds,
+  unitId,
   selectedDate,
   selectedSlot,
   onSelectDate,
@@ -222,6 +224,7 @@ function StepDateAndTime({
   slug: string;
   memberId: string;
   serviceIds: string;
+  unitId?: string | null;
   selectedDate: Date | null;
   selectedSlot: Slot | null;
   onSelectDate: (d: Date) => void;
@@ -242,7 +245,7 @@ function StepDateAndTime({
           const k = fmtDateKey(d);
           try {
             const r = await fetch(
-              `/api/${slug}/availability?memberId=${memberId}&serviceIds=${serviceIds}&date=${k}`,
+              `/api/${slug}/availability?memberId=${memberId}&serviceIds=${serviceIds}&date=${k}${unitId ? `&unitId=${unitId}` : ""}`,
             );
             const json = await r.json();
             return [k, (json.slots?.length ?? 0) > 0] as [string, boolean];
@@ -258,7 +261,7 @@ function StepDateAndTime({
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug, memberId, serviceIds]);
+  }, [slug, memberId, serviceIds, unitId]);
 
   useEffect(() => {
     if (!selectedDate) { setSlots([]); return; }
@@ -267,7 +270,7 @@ function StepDateAndTime({
     (async () => {
       try {
         const r = await fetch(
-          `/api/${slug}/availability?memberId=${memberId}&serviceIds=${serviceIds}&date=${fmtDateKey(selectedDate)}`,
+          `/api/${slug}/availability?memberId=${memberId}&serviceIds=${serviceIds}&date=${fmtDateKey(selectedDate)}${unitId ? `&unitId=${unitId}` : ""}`,
         );
         const json = await r.json();
         if (!cancelled) setSlots(json.slots ?? []);
@@ -278,7 +281,7 @@ function StepDateAndTime({
       }
     })();
     return () => { cancelled = true; };
-  }, [slug, memberId, serviceIds, selectedDate]);
+  }, [slug, memberId, serviceIds, selectedDate, unitId]);
 
   const groups = useMemo(() => {
     const m: Slot[] = [], t: Slot[] = [], n: Slot[] = [];
@@ -614,6 +617,7 @@ export function Wizard({
   loadingServices,
   loadingMembers,
   presetService,
+  unitId,
 }: WizardProps) {
   const [step, setStep] = useState(1);
   const [selectedServices, setSelectedServices] = useState<Service[]>([]);
@@ -708,6 +712,7 @@ export function Wizard({
           clientName: form.clientName.trim(),
           clientPhone: form.clientPhone,
           notes: form.notes || undefined,
+          ...(unitId ? { unitId } : {}),
         }),
       });
       const json = await res.json();
@@ -819,6 +824,7 @@ export function Wizard({
                   slug={slug}
                   memberId={member.id}
                   serviceIds={serviceIdsKey}
+                  unitId={unitId}
                   selectedDate={date}
                   selectedSlot={slot}
                   onSelectDate={(d) => { setDate(d); setSlot(null); }}

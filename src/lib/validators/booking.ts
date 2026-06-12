@@ -14,6 +14,7 @@ export const availabilityQuerySchema = z
     // Multi-serviço: lista de UUIDs separados por vírgula
     serviceIds: uuidList.optional(),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD"),
+    unitId: z.string().uuid().optional(),
   })
   .refine((d) => d.serviceId || d.serviceIds, {
     message: "serviceId or serviceIds is required",
@@ -26,6 +27,7 @@ export const createAppointmentSchema = z
     // Multi-serviço (Corte + Barba + ...) — ordem define a posição
     serviceIds: z.array(z.string().uuid()).min(1).max(5).optional(),
     memberId: z.string().min(1),
+    unitId: z.string().uuid().optional(),
     startsAt: z.string().datetime({ message: "Expected ISO 8601 UTC datetime" }),
     clientName: z.string().min(1).max(200),
     clientPhone: z.string().min(8).max(20),

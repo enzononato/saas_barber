@@ -4,6 +4,7 @@ import { db } from "@/server/db";
 import { appointments, appointmentServices } from "@/server/db/schema";
 import { member, user } from "@/server/db/schema/auth";
 import { workingHours } from "@/server/db/schema/availability";
+import { memberUnits } from "@/server/db/schema/units";
 import { isProfessionalAvailableAt } from "./availability";
 
 export type ServiceItem = {
@@ -18,7 +19,10 @@ export type Professional = {
   name: string;
 };
 
-export async function getOrgProfessionals(orgId: string): Promise<Professional[]> {
+export async function getOrgProfessionals(
+  orgId: string,
+  unitId?: string,
+): Promise<Professional[]> {
   return db
     .select({ userId: member.userId, name: user.name })
     .from(member)
@@ -27,6 +31,21 @@ export async function getOrgProfessionals(orgId: string): Promise<Professional[]
       and(
         eq(member.organizationId, orgId),
         eq(member.isBarber, true),
+        // Restringe aos barbeiros vinculados à unidade.
+        unitId
+          ? exists(
+              db
+                .select({ id: memberUnits.id })
+                .from(memberUnits)
+                .where(
+                  and(
+                    eq(memberUnits.memberId, member.id),
+                    eq(memberUnits.unitId, unitId),
+                  ),
+                )
+                .limit(1),
+            )
+          : undefined,
         exists(
           db
             .select({ id: workingHours.id })
@@ -35,6 +54,7 @@ export async function getOrgProfessionals(orgId: string): Promise<Professional[]
               and(
                 eq(workingHours.organizationId, orgId),
                 eq(workingHours.professionalId, user.id),
+                unitId ? eq(workingHours.unitId, unitId) : undefined,
               ),
             )
             .limit(1),
@@ -56,6 +76,7 @@ function isPgExclusionViolation(err: unknown): boolean {
 export type CreateAppointmentParams = {
   orgId: string;
   professionalId: string;
+  unitId?: string | null;
   serviceId: string;
   serviceNameAtBooking: string;
   priceAtBooking: string;
@@ -90,6 +111,7 @@ export async function createAppointment(
       .insert(appointments)
       .values({
         organizationId: params.orgId,
+        unitId: params.unitId ?? null,
         professionalId: params.professionalId,
         serviceId: params.serviceId,
         serviceNameAtBooking: params.serviceNameAtBooking,
@@ -138,9 +160,10 @@ export async function createAppointmentForAny(
   orgId: string,
   params: Omit<CreateAppointmentParams, "orgId" | "professionalId">,
   timezone = "America/Sao_Paulo",
+  unitId?: string | null,
 ): Promise<CreateAppointmentResult> {
   const endsAt = new Date(params.startsAt.getTime() + params.durationMinutes * 60_000);
-  const professionals = await getOrgProfessionals(orgId);
+  const professionals = await getOrgProfessionals(orgId, unitId ?? undefined);
 
   for (const p of professionals) {
     const available = await isProfessionalAvailableAt(
@@ -149,10 +172,17 @@ export async function createAppointmentForAny(
       params.startsAt,
       endsAt,
       timezone,
+      undefined,
+      unitId ?? undefined,
     );
     if (!available) continue;
 
-    const result = await createAppointment({ ...params, orgId, professionalId: p.userId });
+    const result = await createAppointment({
+      ...params,
+      orgId,
+      professionalId: p.userId,
+      unitId: unitId ?? null,
+    });
     if (result.ok) return result;
     // Race condition: slot snatched between check and insert — tenta o próximo
     if (result.error !== "slot_unavailable") return result;

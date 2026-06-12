@@ -4,10 +4,11 @@ import { and, eq, exists } from "drizzle-orm";
 import { db } from "@/server/db";
 import { member, user } from "@/server/db/schema/auth";
 import { workingHours } from "@/server/db/schema/availability";
+import { memberUnits } from "@/server/db/schema/units";
 import { getOrgBySlug } from "@/server/services/tenant";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await params;
@@ -17,6 +18,8 @@ export async function GET(
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
+  const unitId = req.nextUrl.searchParams.get("unitId");
+
   const professionals = await db
     .select({ id: user.id, name: user.name })
     .from(member)
@@ -25,6 +28,21 @@ export async function GET(
       and(
         eq(member.organizationId, org.id),
         eq(member.isBarber, true),
+        // Barbeiros vinculados à unidade escolhida (member_units).
+        unitId
+          ? exists(
+              db
+                .select({ id: memberUnits.id })
+                .from(memberUnits)
+                .where(
+                  and(
+                    eq(memberUnits.memberId, member.id),
+                    eq(memberUnits.unitId, unitId),
+                  ),
+                )
+                .limit(1),
+            )
+          : undefined,
         exists(
           db
             .select({ id: workingHours.id })
@@ -33,6 +51,7 @@ export async function GET(
               and(
                 eq(workingHours.organizationId, org.id),
                 eq(workingHours.professionalId, user.id),
+                unitId ? eq(workingHours.unitId, unitId) : undefined,
               ),
             )
             .limit(1),
