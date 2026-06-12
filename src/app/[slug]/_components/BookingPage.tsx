@@ -1,11 +1,17 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { BeforeAfter } from "./BeforeAfter";
 import * as Icons from "./Icons";
 import { Reveal } from "./ScrollReveal";
-import { LocationMap, type MapUnit } from "./LocationMap";
+import type { MapUnit } from "./LocationMap";
 import { Wizard, type Member, type Service } from "./Wizard";
+
+const LocationMap = dynamic(
+  () => import("./LocationMap").then((m) => ({ default: m.LocationMap })),
+  { ssr: false },
+);
 
 interface BookingPageProps {
   slug: string;

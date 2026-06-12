@@ -36,8 +36,8 @@ export function LocationMap({ units, activeId, onSelect }: LocationMapProps) {
   // Apenas unidades com coordenadas válidas entram no mapa.
   const geo = units.filter(
     (u): u is MapUnit & { lat: number; lng: number } =>
-      typeof u.lat === "number" && typeof u.lng === "number",
-  );
+      u.lat != null && u.lng != null,
+  ) as Array<MapUnit & { lat: number; lng: number }>;
 
   // Inicializa o mapa uma vez e plota os marcadores.
   useEffect(() => {
@@ -55,6 +55,7 @@ export function LocationMap({ units, activeId, onSelect }: LocationMapProps) {
     mapRef.current = map;
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+    map.resize();
 
     for (const u of geo) {
       // Wrapper: dot em cima + label em baixo (âncora no topo do wrapper)
