@@ -31,6 +31,8 @@ export const units = pgTable(
     lng: doublePrecision("lng"),
     // Link original colado pelo dono (Google Maps), para referência/reextração.
     googleMapsUrl: text("google_maps_url"),
+    // Foto da unidade (URL http ou data URL base64) exibida no popup do mapa.
+    photoUrl: text("photo_url"),
     phone: text("phone"),
     isActive: boolean("is_active").notNull().default(true),
     // Ordenação na vitrine pública.

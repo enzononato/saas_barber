@@ -481,6 +481,19 @@ Módulo robusto de Business Intelligence dentro do `/gstsantos/financial`, organ
 
 **Deploy:** migração 0011 JÁ APLICADA em produção (12/06/2026). Falta: `git push` → rebuild EasyPanel → `npm run db:backfill-units` no container.
 
+**Sub-fase 4 — Mapa público: renderização + labels + foto por unidade (12/06/2026):**
+- [x] **Bugfix mapa preto em produção**: MapLibre não desenhava (nem tiles nem pins). Causas e correções:
+  - `LocationMap` importado via `dynamic(ssr:false)` no `BookingPage` (WebGL não roda em SSR)
+  - Init do mapa só após o container ter dimensões reais (guarda `requestAnimationFrame`); sem isso inicializava 0×0
+  - **Service worker (Serwist)**: `defaultCache` roteava TODA requisição cross-origin por `NetworkFirst` com cap de 32 entradas → thrashing nas tiles do Carto. Adicionado bypass `NetworkOnly` para `cartocdn.com` em `src/app/sw.ts`
+  - Canvas preto pós-load (animação de reveal mexendo no transform): `ResizeObserver` + `resize()/triggerRepaint()` adiados (150/450/900ms) + `width/height:100%` explícito no `.gst-map-canvas`
+- [x] Labels sempre visíveis abaixo de cada pin (estilo 21st.dev); wrapper dot+label com `anchor:"top"`
+- [x] Primeira visão enquadra TODAS as unidades (`fitBounds`); `flyTo` inicial pulado via `didFlyRef` para não anular o enquadramento
+- [x] **Foto por unidade no popup do mapa**: coluna `photo_url` (migração 0012). Dono envia upload (comprimido no cliente p/ JPEG ~1000px via canvas → data URL) OU cola URL. Popup mostra foto real com banner-monograma dourado de fallback. Validação aceita `http(s)` ou `data:image/` até ~2MB
+- [x] Validação: tsc 0 erros
+
+**Deploy Sub-fase 4:** Falta: `git push` → rebuild EasyPanel → `npm run db:migrate` (aplica 0012) no container.
+
 ---
 
 ## Decisões Tomadas (não reabrir sem motivo)

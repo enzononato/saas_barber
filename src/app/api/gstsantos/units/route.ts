@@ -7,6 +7,22 @@ import { serviceUnits, units } from "@/server/db/schema/units";
 import { requireAuth } from "@/server/middleware/requireAuth";
 import { resolveGoogleMapsLink } from "@/server/services/google-maps";
 
+// Limite generoso: um JPEG ~800px comprimido em data URL fica < 300KB.
+const PHOTO_MAX_CHARS = 2_000_000; // ~2MB de string
+
+/**
+ * Valida a foto da unidade. Aceita URL http(s) ou data URL de imagem.
+ * Retorna a string normalizada, `null` se vazia, ou `false` se grande demais.
+ */
+function normalizePhotoUrl(value: unknown): string | null | false {
+  if (value == null) return null;
+  const s = String(value).trim();
+  if (!s) return null;
+  if (s.length > PHOTO_MAX_CHARS) return false;
+  if (/^https?:\/\//i.test(s) || /^data:image\//i.test(s)) return s;
+  return null;
+}
+
 function slugify(value: string): string {
   return value
     .normalize("NFD")
@@ -61,6 +77,7 @@ export async function POST(req: Request) {
     lat?: number;
     lng?: number;
     phone?: string;
+    photoUrl?: string | null;
   };
 
   let { lat, lng } = body;
@@ -86,6 +103,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "name_required" }, { status: 400 });
   }
 
+  const photoUrl = normalizePhotoUrl(body.photoUrl);
+  if (photoUrl === false) {
+    return NextResponse.json({ error: "photo_too_large" }, { status: 413 });
+  }
+
   // Próxima posição (no fim da lista).
   const positionRows = await db
     .select({ position: units.position })
@@ -105,6 +127,7 @@ export async function POST(req: Request) {
       lat: lat ?? null,
       lng: lng ?? null,
       googleMapsUrl: body.googleMapsUrl?.trim() || null,
+      photoUrl: photoUrl || null,
       phone: body.phone?.trim() || null,
       position: nextPosition,
     })

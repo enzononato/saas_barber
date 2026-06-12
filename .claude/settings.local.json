@@ -15,7 +15,10 @@
       "Bash(ls -la \"c:\\\\\\\\Users\\\\\\\\enzo.jz\\\\\\\\Documents\\\\\\\\dev projects\\\\\\\\SaaS barber\\\\\\\\src\\\\\\\\app\\\\\\\\gstsantos\\\\\\\\\\(protected\\)\\\\\\\\\")",
       "Bash(npx web-push *)",
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\enzo.jz\\\\Documents\\\\dev projects\\\\SaaS barber\" -Directory)",
-      "Bash(findstr \"appointments\")"
+      "Bash(findstr \"appointments\")",
+      "Bash(xargs grep -l \"defaultCache\\\\|cross-origin\\\\|crossOrigin\")",
+      "Bash(node -e \"const s=require\\('serwist'\\); console.log\\('NetworkOnly' in s, 'NetworkFirst' in s\\)\")",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

@@ -85,6 +85,13 @@
       "when": 1781240124407,
       "tag": "0011_units_multi_unit",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1781326524407,
+      "tag": "0012_units_photo",
+      "breakpoints": true
     }
   ]
 }

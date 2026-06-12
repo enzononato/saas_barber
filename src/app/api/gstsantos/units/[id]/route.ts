@@ -7,6 +7,18 @@ import { units } from "@/server/db/schema/units";
 import { requireAuth } from "@/server/middleware/requireAuth";
 import { resolveGoogleMapsLink } from "@/server/services/google-maps";
 
+const PHOTO_MAX_CHARS = 2_000_000; // ~2MB de string (URL ou data URL base64)
+
+/** URL http(s) ou data URL de imagem; `null` se vazio; `false` se grande demais. */
+function normalizePhotoUrl(value: unknown): string | null | false {
+  if (value == null) return null;
+  const s = String(value).trim();
+  if (!s) return null;
+  if (s.length > PHOTO_MAX_CHARS) return false;
+  if (/^https?:\/\//i.test(s) || /^data:image\//i.test(s)) return s;
+  return null;
+}
+
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -26,6 +38,7 @@ export async function PATCH(
     lat: number | null;
     lng: number | null;
     googleMapsUrl: string | null;
+    photoUrl: string | null;
     phone: string | null;
     isActive: boolean;
     position: number;
@@ -38,6 +51,13 @@ export async function PATCH(
   if ("position" in body) patch.position = Number(body.position);
   if ("lat" in body) patch.lat = body.lat === null ? null : Number(body.lat);
   if ("lng" in body) patch.lng = body.lng === null ? null : Number(body.lng);
+  if ("photoUrl" in body) {
+    const photo = normalizePhotoUrl(body.photoUrl);
+    if (photo === false) {
+      return NextResponse.json({ error: "photo_too_large" }, { status: 413 });
+    }
+    patch.photoUrl = photo;
+  }
 
   // Se o link do Maps mudou e não vieram lat/lng explícitos, re-resolve.
   if ("googleMapsUrl" in body) {

@@ -85,6 +85,7 @@ export default async function Page({
         lng: units.lng,
         phone: units.phone,
         googleMapsUrl: units.googleMapsUrl,
+        photoUrl: units.photoUrl,
       })
       .from(units)
       .where(and(eq(units.organizationId, org.id), eq(units.isActive, true)))

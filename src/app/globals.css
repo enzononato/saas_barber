@@ -845,14 +845,42 @@ section.block + section.block { border-top: 1px solid rgba(201,168,76,0.10); }
   border-top-color: #16140F;
   border-bottom-color: #16140F;
 }
-.gst-map-popup { display: flex; flex-direction: column; gap: 4px; min-width: 150px; }
-.gst-map-popup strong { font-size: 13px; color: var(--paper); }
-.gst-map-popup span { font-size: 11.5px; color: var(--paper-dim); line-height: 1.4; }
-.gst-map-popup a {
-  font-size: 11px; color: var(--gold); font-weight: 600;
-  text-decoration: none; margin-top: 3px;
+/* o popup com foto precisa de padding 0 no content (a foto vai sangrada) */
+.gst-map .gst-map-popup-wrap .maplibregl-popup-content { padding: 0; overflow: hidden; }
+.gst-map-popup { display: flex; flex-direction: column; min-width: 200px; }
+.gst-map-popup-banner {
+  position: relative;
+  height: 110px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #1C1A13, #11100B);
 }
-.gst-map-popup a:hover { text-decoration: underline; }
+.gst-map-popup-banner img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+/* leve gradiente para a foto fundir com o corpo escuro do popup */
+.gst-map-popup-banner::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(22,20,15,0.9));
+}
+.gst-map-popup-banner--mono {
+  display: grid; place-items: center;
+  background:
+    radial-gradient(120% 100% at 50% 0%, rgba(201,168,76,0.18), transparent 60%),
+    linear-gradient(135deg, #1C1A13, #11100B);
+}
+.gst-map-popup-mono {
+  font-family: 'Playfair Display', serif;
+  font-size: 44px; line-height: 1; color: var(--gold);
+  text-shadow: 0 2px 12px rgba(0,0,0,0.6);
+}
+.gst-map-popup-body { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px 13px; }
+.gst-map-popup-body strong { font-size: 13.5px; color: var(--paper); letter-spacing: 0.01em; }
+.gst-map-popup-body span { font-size: 11.5px; color: var(--paper-dim); line-height: 1.4; }
+.gst-map-popup-body a {
+  font-size: 11px; color: var(--gold); font-weight: 600;
+  text-decoration: none; margin-top: 4px; width: fit-content;
+}
+.gst-map-popup-body a:hover { text-decoration: underline; }
 
 /* lista de unidades na vitrine pública */
 .unit-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }

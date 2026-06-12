@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Check, MapPin, Phone, Plus, Search, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Check, ImagePlus, MapPin, Phone, Plus, Search, Trash2, X } from "lucide-react";
 
 interface Unit {
   id: string;
@@ -11,6 +11,7 @@ interface Unit {
   lat: number | null;
   lng: number | null;
   googleMapsUrl: string | null;
+  photoUrl: string | null;
   phone: string | null;
   isActive: boolean;
   position: number;
@@ -21,6 +22,7 @@ interface FormState {
   googleMapsUrl: string;
   address: string;
   phone: string;
+  photoUrl: string;
   lat: number | null;
   lng: number | null;
 }
@@ -30,9 +32,46 @@ const EMPTY_FORM: FormState = {
   googleMapsUrl: "",
   address: "",
   phone: "",
+  photoUrl: "",
   lat: null,
   lng: null,
 };
+
+/**
+ * Comprime uma imagem no navegador (max 1000px, JPEG) e devolve um data URL.
+ * Mantém o arquivo pequeno o suficiente para guardar direto na coluna do banco.
+ */
+async function fileToCompressedDataUrl(file: File): Promise<string> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Não consegui ler o arquivo."));
+    reader.readAsDataURL(file);
+  });
+
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const im = new Image();
+    im.onload = () => resolve(im);
+    im.onerror = () => reject(new Error("Imagem inválida."));
+    im.src = dataUrl;
+  });
+
+  const MAX = 1000;
+  let { width, height } = img;
+  if (width > MAX || height > MAX) {
+    const scale = MAX / Math.max(width, height);
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const cctx = canvas.getContext("2d");
+  if (!cctx) return dataUrl;
+  cctx.drawImage(img, 0, 0, width, height);
+  return canvas.toDataURL("image/jpeg", 0.72);
+}
 
 export default function UnitsPage() {
   const [units, setUnits] = useState<Unit[]>([]);
@@ -43,6 +82,8 @@ export default function UnitsPage() {
   const [resolving, setResolving] = useState(false);
   const [resolveMsg, setResolveMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchUnits = useCallback(async () => {
     setLoading(true);
@@ -74,6 +115,7 @@ export default function UnitsPage() {
       googleMapsUrl: u.googleMapsUrl ?? "",
       address: u.address ?? "",
       phone: u.phone ?? "",
+      photoUrl: u.photoUrl ?? "",
       lat: u.lat,
       lng: u.lng,
     });
@@ -118,6 +160,7 @@ export default function UnitsPage() {
       googleMapsUrl: form.googleMapsUrl.trim() || null,
       address: form.address.trim() || null,
       phone: form.phone.trim() || null,
+      photoUrl: form.photoUrl.trim() || null,
       lat: form.lat,
       lng: form.lng,
     };
@@ -140,6 +183,24 @@ export default function UnitsPage() {
     } else {
       const err = (await res.json().catch(() => ({}))) as { message?: string };
       setResolveMsg({ ok: false, text: err.message ?? "Erro ao salvar. Tente novamente." });
+    }
+  }
+
+  async function handlePhotoFile(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setResolveMsg({ ok: false, text: "Selecione um arquivo de imagem." });
+      return;
+    }
+    setPhotoBusy(true);
+    try {
+      const dataUrl = await fileToCompressedDataUrl(file);
+      setForm((f) => ({ ...f, photoUrl: dataUrl }));
+    } catch (err) {
+      setResolveMsg({ ok: false, text: (err as Error).message });
+    } finally {
+      setPhotoBusy(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
 
@@ -382,6 +443,92 @@ export default function UnitsPage() {
                 className="gst-input"
                 style={{ width: "100%" }}
                 placeholder="(74) 3500-0000"
+              />
+            </Field>
+
+            <Field label="Foto da unidade (aparece no mapa)">
+              {form.photoUrl ? (
+                <div
+                  style={{
+                    position: "relative",
+                    width: "100%",
+                    height: 140,
+                    borderRadius: 10,
+                    overflow: "hidden",
+                    border: "1px solid #2A2620",
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={form.photoUrl}
+                    alt="Pré-visualização"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, photoUrl: "" }))}
+                    aria-label="Remover foto"
+                    style={{
+                      position: "absolute",
+                      top: 8,
+                      right: 8,
+                      width: 30,
+                      height: 30,
+                      borderRadius: "50%",
+                      border: "1px solid rgba(255,255,255,0.2)",
+                      background: "rgba(0,0,0,0.55)",
+                      color: "#F4EEDF",
+                      cursor: "pointer",
+                      display: "grid",
+                      placeItems: "center",
+                    }}
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={photoBusy}
+                  style={{
+                    width: "100%",
+                    height: 96,
+                    borderRadius: 10,
+                    border: "1px dashed #3A352C",
+                    background: "rgba(201,168,76,0.04)",
+                    color: "#8A847A",
+                    cursor: photoBusy ? "wait" : "pointer",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    fontSize: 12,
+                  }}
+                >
+                  <ImagePlus size={20} strokeWidth={1.6} />
+                  {photoBusy ? "Processando..." : "Enviar uma foto (JPG/PNG)"}
+                </button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(e) => void handlePhotoFile(e.target.files?.[0])}
+              />
+              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "10px 0 0" }}>
+                <span style={{ height: 1, flex: 1, background: "#2A2620" }} />
+                <span style={{ fontSize: 10, color: "#6B655C", letterSpacing: "0.1em" }}>OU COLE UMA URL</span>
+                <span style={{ height: 1, flex: 1, background: "#2A2620" }} />
+              </div>
+              <input
+                value={form.photoUrl.startsWith("data:") ? "" : form.photoUrl}
+                onChange={(e) => setForm((f) => ({ ...f, photoUrl: e.target.value }))}
+                className="gst-input"
+                style={{ width: "100%", marginTop: 8 }}
+                placeholder="https://exemplo.com/foto.jpg"
               />
             </Field>
 
