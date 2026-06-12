@@ -57,24 +57,33 @@ export function LocationMap({ units, activeId, onSelect }: LocationMapProps) {
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
 
     for (const u of geo) {
+      // Wrapper: dot em cima + label em baixo (âncora no topo do wrapper)
       const el = document.createElement("div");
-      el.className = "gst-map-pin";
+      el.className = "gst-map-pin-wrap";
       el.setAttribute("data-unit", u.id);
+
+      const dot = document.createElement("div");
+      dot.className = "gst-map-pin";
+      el.appendChild(dot);
+
+      const labelEl = document.createElement("div");
+      labelEl.className = "gst-map-pin-label";
+      labelEl.textContent = u.name;
+      el.appendChild(labelEl);
 
       const popupHtml = `
         <div class="gst-map-popup">
-          <strong>${escapeHtml(u.name)}</strong>
           ${u.address ? `<span>${escapeHtml(u.address)}</span>` : ""}
           <a href="${escapeHtml(u.googleMapsUrl ?? `https://www.google.com/maps/dir/?api=1&destination=${u.lat},${u.lng}`)}" target="_blank" rel="noopener noreferrer">Como chegar →</a>
         </div>`;
-      const popup = new maplibregl.Popup({ offset: 18, closeButton: false }).setHTML(popupHtml);
+      const popup = new maplibregl.Popup({ offset: 30, closeButton: false }).setHTML(popupHtml);
 
-      const marker = new maplibregl.Marker({ element: el, anchor: "center" })
+      const marker = new maplibregl.Marker({ element: el, anchor: "top" })
         .setLngLat([u.lng, u.lat])
         .setPopup(popup)
         .addTo(map);
 
-      el.addEventListener("click", () => onSelectRef.current?.(u.id));
+      dot.addEventListener("click", () => onSelectRef.current?.(u.id));
       markersRef.current.set(u.id, marker);
     }
 
@@ -103,8 +112,8 @@ export function LocationMap({ units, activeId, onSelect }: LocationMapProps) {
     const map = mapRef.current;
     if (!map) return;
     markersRef.current.forEach((marker, id) => {
-      const el = marker.getElement();
-      el.classList.toggle("on", id === activeId);
+      const dot = marker.getElement().querySelector(".gst-map-pin");
+      dot?.classList.toggle("on", id === activeId);
     });
     if (activeId) {
       const u = geo.find((g) => g.id === activeId);

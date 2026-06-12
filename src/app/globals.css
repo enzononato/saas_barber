@@ -759,6 +759,30 @@ section.block + section.block { border-top: 1px solid rgba(201,168,76,0.10); }
   transform: translateY(-1px);
   box-shadow: 0 10px 24px -8px rgba(201,168,76,0.8);
 }
+/* wrapper do marcador: dot + label */
+.gst-map-pin-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.gst-map-pin-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: #F4EEDF;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.9), 0 0 12px rgba(0,0,0,0.7);
+  pointer-events: none;
+  user-select: none;
+  transition: color .2s var(--ease);
+}
+.gst-map-pin-wrap:has(.gst-map-pin.on) .gst-map-pin-label {
+  color: var(--gold);
+}
 /* marcador dourado pulsante */
 .gst-map-pin {
   position: relative;
