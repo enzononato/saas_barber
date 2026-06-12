@@ -12,6 +12,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { organization, user } from "./auth";
+import { units } from "./units";
 
 export const expenses = pgTable(
   "expenses",
@@ -20,6 +21,7 @@ export const expenses = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
+    unitId: uuid("unit_id").references(() => units.id, { onDelete: "set null" }),
     description: text("description").notNull(),
     category: text("category"),
     amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),

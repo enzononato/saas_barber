@@ -13,6 +13,7 @@ import {
 
 import { organization, user } from "./auth";
 import { services } from "./services";
+import { units } from "./units";
 
 export const appointmentStatus = pgEnum("appointment_status", [
   "SCHEDULED",
@@ -31,6 +32,7 @@ export const appointments = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
+    unitId: uuid("unit_id").references(() => units.id, { onDelete: "restrict" }),
     professionalId: text("professional_id")
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),
@@ -67,6 +69,7 @@ export const appointments = pgTable(
       table.status,
       table.startsAt,
     ),
+    index("appointments_unit_starts_at_idx").on(table.unitId, table.startsAt),
     check(
       "appointments_time_range_check",
       sql`${table.startsAt} < ${table.endsAt}`,

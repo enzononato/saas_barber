@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BeforeAfter } from "./BeforeAfter";
 import * as Icons from "./Icons";
 import { Reveal } from "./ScrollReveal";
+import { LocationMap, type MapUnit } from "./LocationMap";
 import { Wizard, type Member, type Service } from "./Wizard";
 
 interface BookingPageProps {
@@ -12,6 +13,7 @@ interface BookingPageProps {
   initialServices: Service[];
   initialMembers: Member[];
   teamMembers: Member[];
+  units: MapUnit[];
 }
 
 const fmtPrice = (price: string) =>
@@ -375,7 +377,7 @@ function Testimonials() {
   );
 }
 
-function Location() {
+function Location({ units }: { units: MapUnit[] }) {
   const hours = [
     { day: "Segunda", h: "09h – 19h" },
     { day: "Terça", h: "09h – 19h" },
@@ -385,6 +387,11 @@ function Location() {
     { day: "Sábado", h: "09h – 18h" },
     { day: "Domingo", h: "Fechado", closed: true },
   ];
+
+  const located = units.filter((u) => u.lat != null && u.lng != null);
+  const multi = located.length > 1;
+  const [activeId, setActiveId] = useState<string | null>(located[0]?.id ?? null);
+
   return (
     <section className="block" id="contato">
       <div className="container">
@@ -396,15 +403,41 @@ function Location() {
         </Reveal>
         <div className="loc-grid">
           <Reveal kind="left">
-            <div className="map-ph">
-              <div className="pin" />
-              <div className="pin-label">— 09°24′40″S · 40°30′01″W</div>
-            </div>
-            <div className="loc-addr">
-              <span className="pill">Endereço</span>
-              <span className="street">Travessa Dr. Édson Ribeiro, 10 A</span>
-              <span className="city">Juazeiro — BA · 48903-560</span>
-            </div>
+            <LocationMap units={located} activeId={activeId} onSelect={setActiveId} />
+
+            {multi ? (
+              <div className="unit-list">
+                {located.map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    className={`unit-item${u.id === activeId ? " on" : ""}`}
+                    onClick={() => setActiveId(u.id)}
+                  >
+                    <Icons.Pin style={{ width: 16, height: 16, color: "var(--gold)", flexShrink: 0 }} />
+                    <span className="unit-text">
+                      <span className="unit-name">{u.name}</span>
+                      {u.address && <span className="unit-addr">{u.address}</span>}
+                    </span>
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${u.lat},${u.lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="unit-go"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Ir →
+                    </a>
+                  </button>
+                ))}
+              </div>
+            ) : located[0] ? (
+              <div className="loc-addr">
+                <span className="pill">Endereço</span>
+                <span className="street">{located[0].name}</span>
+                {located[0].address && <span className="city">{located[0].address}</span>}
+              </div>
+            ) : null}
           </Reveal>
           <Reveal className="loc-card" kind="right" delay={120}>
             <span
@@ -428,26 +461,18 @@ function Location() {
               ))}
             </div>
             <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 10 }}>
-              <a
-                href="tel:+557435000000"
-                className="btn btn-ghost"
-                style={{ justifyContent: "flex-start", padding: "14px 18px" }}
-              >
-                <Icons.Phone style={{ width: 16, height: 16, color: "var(--gold)" }} />
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13 }}>
-                  (74) 3500-0000
-                </span>
-              </a>
-              <a
-                href="#top"
-                className="btn btn-ghost"
-                style={{ justifyContent: "flex-start", padding: "14px 18px" }}
-              >
-                <Icons.Pin style={{ width: 16, height: 16, color: "var(--gold)" }} />
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13 }}>
-                  Como chegar →
-                </span>
-              </a>
+              {located[0]?.phone && (
+                <a
+                  href={`tel:${located[0].phone.replace(/\D/g, "")}`}
+                  className="btn btn-ghost"
+                  style={{ justifyContent: "flex-start", padding: "14px 18px" }}
+                >
+                  <Icons.Phone style={{ width: 16, height: 16, color: "var(--gold)" }} />
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13 }}>
+                    {located[0].phone}
+                  </span>
+                </a>
+              )}
             </div>
           </Reveal>
         </div>
@@ -473,6 +498,7 @@ export function BookingPage({
   initialServices,
   initialMembers,
   teamMembers,
+  units,
 }: BookingPageProps) {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [presetService, setPresetService] = useState<Service | null>(null);
@@ -504,7 +530,7 @@ export function BookingPage({
       <Services services={initialServices} onBook={(s) => openWizard(s)} />
       <Team members={teamMembers} />
       <Testimonials />
-      <Location />
+      <Location units={units} />
       <Footer />
 
       <div className="sticky-cta">

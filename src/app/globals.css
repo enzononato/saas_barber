@@ -712,28 +712,143 @@ section.block + section.block { border-top: 1px solid rgba(201,168,76,0.10); }
 .loc-addr .pill { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.2em; color: var(--gold); text-transform: uppercase; }
 .loc-addr .street { font-family: 'Playfair Display', serif; font-size: 22px; line-height: 1.2; }
 .loc-addr .city { color: var(--paper-dim); font-size: 14px; }
-.map-ph {
+/* mapa de localização (MapLibre) */
+.gst-map {
+  position: relative;
   aspect-ratio: 4/3;
   border: 1px solid var(--ink-line);
   border-radius: var(--radius-lg);
-  background:
-    radial-gradient(circle at 60% 50%, rgba(201,168,76,0.12), transparent 50%),
-    repeating-linear-gradient(0deg, rgba(201,168,76,0.04) 0 1px, transparent 1px 32px),
-    repeating-linear-gradient(90deg, rgba(201,168,76,0.04) 0 1px, transparent 1px 32px),
-    var(--ink-2);
-  position: relative;
-  display: grid; place-items: center;
+  overflow: hidden;
+  background: var(--ink-2);
 }
-.map-ph .pin {
+.gst-map-canvas { position: absolute; inset: 0; }
+/* leve overlay dourado pra integrar o mapa ao tema da página */
+.gst-map::after {
+  content: "";
+  position: absolute; inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 80px rgba(0,0,0,0.55);
+  background: radial-gradient(circle at 50% 45%, transparent 55%, rgba(201,168,76,0.06));
+  z-index: 1;
+}
+.gst-map-label {
+  position: absolute; bottom: 14px; left: 14px; z-index: 2;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  color: var(--paper-mute); letter-spacing: 0.16em;
+  padding: 5px 9px; border-radius: 999px;
+  background: rgba(11,11,11,0.7);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid var(--ink-line);
+  pointer-events: none;
+}
+.gst-map-cta {
+  position: absolute; top: 12px; left: 12px; z-index: 2;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border-radius: 999px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: #1A1408; font-weight: 700; text-decoration: none;
+  background: linear-gradient(180deg,#E0BE5C,#C9A84C 48%,#8E6A24);
+  box-shadow: 0 6px 18px -8px rgba(201,168,76,0.6);
+  transition: transform .18s var(--ease), box-shadow .18s var(--ease);
+}
+.gst-map-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px -8px rgba(201,168,76,0.8);
+}
+/* marcador dourado pulsante */
+.gst-map-pin {
+  position: relative;
   width: 14px; height: 14px; border-radius: 50%;
   background: var(--gold);
   box-shadow: 0 0 0 6px rgba(201,168,76,0.18), 0 0 0 16px rgba(201,168,76,0.08);
+  cursor: pointer;
 }
-.map-ph .pin-label {
-  position: absolute; bottom: 14px; left: 14px;
-  font-family: 'JetBrains Mono', monospace; font-size: 10px;
-  color: var(--paper-mute); letter-spacing: 0.16em;
+.gst-map-pin::after {
+  content: "";
+  position: absolute; inset: -6px;
+  border-radius: 50%;
+  border: 1.5px solid var(--gold);
+  animation: gstMapPing 2.4s ease-out infinite;
 }
+@keyframes gstMapPing {
+  0% { transform: scale(0.7); opacity: 0.8; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+/* controles do MapLibre adaptados ao tema dark/dourado */
+.gst-map .maplibregl-ctrl-group {
+  background: rgba(11,11,11,0.82);
+  border: 1px solid var(--ink-line);
+  border-radius: 10px;
+  overflow: hidden;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.gst-map .maplibregl-ctrl-group button {
+  width: 30px; height: 30px;
+  background: transparent;
+}
+.gst-map .maplibregl-ctrl-group button + button { border-top: 1px solid var(--ink-line); }
+.gst-map .maplibregl-ctrl-group button:hover { background: rgba(201,168,76,0.12); }
+.gst-map .maplibregl-ctrl button .maplibregl-ctrl-icon { filter: invert(1) sepia(1) saturate(0.4) hue-rotate(5deg) brightness(0.95); }
+.gst-map .maplibregl-ctrl-attrib {
+  background: rgba(11,11,11,0.7);
+  font-size: 9px;
+}
+.gst-map .maplibregl-ctrl-attrib a { color: var(--paper-mute); }
+@media (prefers-reduced-motion: reduce) {
+  .gst-map-pin::after { animation: none; }
+}
+
+/* pin destacado quando a unidade está selecionada na lista */
+.gst-map-pin.on {
+  box-shadow: 0 0 0 6px rgba(201,168,76,0.30), 0 0 0 18px rgba(201,168,76,0.12);
+  z-index: 3;
+}
+/* popup do maplibre adaptado ao tema dark/dourado */
+.gst-map .maplibregl-popup-content {
+  background: #16140F;
+  border: 1px solid rgba(201,168,76,0.3);
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 14px 34px -12px rgba(0,0,0,0.85);
+}
+.gst-map .maplibregl-popup-tip {
+  border-top-color: #16140F;
+  border-bottom-color: #16140F;
+}
+.gst-map-popup { display: flex; flex-direction: column; gap: 4px; min-width: 150px; }
+.gst-map-popup strong { font-size: 13px; color: var(--paper); }
+.gst-map-popup span { font-size: 11.5px; color: var(--paper-dim); line-height: 1.4; }
+.gst-map-popup a {
+  font-size: 11px; color: var(--gold); font-weight: 600;
+  text-decoration: none; margin-top: 3px;
+}
+.gst-map-popup a:hover { text-decoration: underline; }
+
+/* lista de unidades na vitrine pública */
+.unit-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.unit-item {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; text-align: left;
+  padding: 13px 16px; border-radius: 12px;
+  background: var(--ink-2); border: 1px solid var(--ink-line);
+  color: inherit; cursor: pointer;
+  transition: border-color .2s var(--ease), background .2s var(--ease), transform .2s var(--ease);
+}
+.unit-item:hover { border-color: rgba(201,168,76,0.35); transform: translateY(-1px); }
+.unit-item.on { border-color: var(--gold); background: rgba(201,168,76,0.06); }
+.unit-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.unit-name { font-weight: 600; font-size: 15px; }
+.unit-addr { color: var(--paper-dim); font-size: 12.5px; }
+.unit-go {
+  flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--gold); text-decoration: none; padding: 6px 11px;
+  border: 1px solid rgba(201,168,76,0.3); border-radius: 999px;
+  transition: background .2s var(--ease);
+}
+.unit-go:hover { background: rgba(201,168,76,0.12); }
 
 /* footer */
 footer {

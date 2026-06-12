@@ -5,6 +5,7 @@ import { db } from "@/server/db";
 import { member, user } from "@/server/db/schema/auth";
 import { workingHours } from "@/server/db/schema/availability";
 import { services } from "@/server/db/schema/services";
+import { units } from "@/server/db/schema/units";
 import { getOrgBySlug } from "@/server/services/tenant";
 import { BookingPage } from "./_components/BookingPage";
 
@@ -31,7 +32,7 @@ export default async function Page({
   const org = await getOrgBySlug(slug);
   if (!org) notFound();
 
-  const [servicesRows, teamRows, bookingMembersRows] = await Promise.all([
+  const [servicesRows, teamRows, bookingMembersRows, unitsRows] = await Promise.all([
     db
       .select({
         id: services.id,
@@ -74,6 +75,20 @@ export default async function Page({
         ),
       )
       .orderBy(user.name),
+    // Unidades ativas para a seção de localização (mapa)
+    db
+      .select({
+        id: units.id,
+        name: units.name,
+        address: units.address,
+        lat: units.lat,
+        lng: units.lng,
+        phone: units.phone,
+        googleMapsUrl: units.googleMapsUrl,
+      })
+      .from(units)
+      .where(and(eq(units.organizationId, org.id), eq(units.isActive, true)))
+      .orderBy(units.position),
   ]);
 
   const bookingMembers = [{ id: "any", name: "Sem preferência" }, ...bookingMembersRows];
@@ -85,6 +100,7 @@ export default async function Page({
       initialServices={servicesRows}
       initialMembers={bookingMembers}
       teamMembers={teamRows}
+      units={unitsRows}
     />
   );
 }

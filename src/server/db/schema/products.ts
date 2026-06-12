@@ -13,6 +13,7 @@ import {
 
 import { organization } from "./auth";
 import { appointments } from "./appointments";
+import { units } from "./units";
 
 export const products = pgTable(
   "products",
@@ -21,6 +22,7 @@ export const products = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
+    unitId: uuid("unit_id").references(() => units.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     price: numeric("price", { precision: 10, scale: 2 }).notNull(),
     costPrice: numeric("cost_price", { precision: 10, scale: 2 }).notNull().default("0"),

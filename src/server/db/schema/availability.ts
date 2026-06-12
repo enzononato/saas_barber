@@ -11,6 +11,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { organization, user } from "./auth";
+import { units } from "./units";
 
 export const workingHours = pgTable(
   "working_hours",
@@ -19,6 +20,7 @@ export const workingHours = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
+    unitId: uuid("unit_id").references(() => units.id, { onDelete: "cascade" }),
     professionalId: text("professional_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -53,6 +55,7 @@ export const timeExceptions = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
+    unitId: uuid("unit_id").references(() => units.id, { onDelete: "cascade" }),
     professionalId: text("professional_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),

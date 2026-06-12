@@ -78,6 +78,13 @@
       "when": 1780056000000,
       "tag": "0010_pos_products_multiservice_reminders",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1781240124407,
+      "tag": "0011_units_multi_unit",
+      "breakpoints": true
     }
   ]
 }

@@ -9,6 +9,7 @@ import {
   CalendarClock,
   DollarSign,
   LogOut,
+  MapPin,
   MessageCircle,
   Package,
   Scissors,
@@ -47,6 +48,7 @@ export function SidebarNav({ role, canManageBarbers, isBarber }: Props) {
       : []),
     ...(role === "owner"
       ? [
+          { href: "/gstsantos/units", label: "Unidades", icon: MapPin },
           { href: "/gstsantos/products", label: "Produtos", icon: Package },
           { href: "/gstsantos/whatsapp", label: "WhatsApp", icon: MessageCircle },
         ]
