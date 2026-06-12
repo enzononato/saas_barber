@@ -377,6 +377,11 @@ function Testimonials() {
   );
 }
 
+/** Link do Google Maps: usa o link colado pelo dono; senão monta rota por lat/lng. */
+function mapsHref(u: MapUnit): string {
+  return u.googleMapsUrl ?? `https://www.google.com/maps/dir/?api=1&destination=${u.lat},${u.lng}`;
+}
+
 function Location({ units }: { units: MapUnit[] }) {
   const hours = [
     { day: "Segunda", h: "09h – 19h" },
@@ -408,11 +413,15 @@ function Location({ units }: { units: MapUnit[] }) {
             {multi ? (
               <div className="unit-list">
                 {located.map((u) => (
-                  <button
+                  <div
                     key={u.id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     className={`unit-item${u.id === activeId ? " on" : ""}`}
                     onClick={() => setActiveId(u.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") setActiveId(u.id);
+                    }}
                   >
                     <Icons.Pin style={{ width: 16, height: 16, color: "var(--gold)", flexShrink: 0 }} />
                     <span className="unit-text">
@@ -420,7 +429,7 @@ function Location({ units }: { units: MapUnit[] }) {
                       {u.address && <span className="unit-addr">{u.address}</span>}
                     </span>
                     <a
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${u.lat},${u.lng}`}
+                      href={mapsHref(u)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="unit-go"
@@ -428,7 +437,7 @@ function Location({ units }: { units: MapUnit[] }) {
                     >
                       Ir →
                     </a>
-                  </button>
+                  </div>
                 ))}
               </div>
             ) : located[0] ? (
@@ -436,6 +445,15 @@ function Location({ units }: { units: MapUnit[] }) {
                 <span className="pill">Endereço</span>
                 <span className="street">{located[0].name}</span>
                 {located[0].address && <span className="city">{located[0].address}</span>}
+                <a
+                  href={mapsHref(located[0])}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="unit-go"
+                  style={{ marginTop: 10, alignSelf: "flex-start" }}
+                >
+                  Ver no Google Maps →
+                </a>
               </div>
             ) : null}
           </Reveal>

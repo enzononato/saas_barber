@@ -137,6 +137,8 @@ export default function FinancialPage() {
   const [tab, setTab] = useState<Tab>("overview");
   const [period, setPeriod] = useState<Period>("month");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [units, setUnits] = useState<{ id: string; name: string }[]>([]);
+  const [unitFilter, setUnitFilter] = useState<string>("all");
   const [data, setData] = useState<FinancialData | null>(null);
   const [loading, setLoading] = useState(true);
   const [insights, setInsights] = useState<InsightsData | null>(null);
@@ -150,27 +152,37 @@ export default function FinancialPage() {
     date: new Date().toISOString().slice(0, 10),
     isRecurring: false,
     attributedToUserId: "",
+    unitId: "",
   });
   const [savingExpense, setSavingExpense] = useState(false);
   const [barberOptions, setBarberOptions] = useState<BarberOption[]>([]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/gstsantos/financial?period=${period}&date=${date}`);
+    const url =
+      `/api/gstsantos/financial?period=${period}&date=${date}` +
+      (unitFilter !== "all" ? `&unitId=${unitFilter}` : "");
+    const res = await fetch(url);
     if (res.ok) setData(await res.json());
     setLoading(false);
-  }, [period, date]);
+  }, [period, date, unitFilter]);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
 
   const isOwner = Boolean(data?.byBarber);
+
+  // Trocar de unidade invalida o cache de insights
+  useEffect(() => { setInsights(null); }, [unitFilter]);
 
   const fetchInsights = useCallback(async () => {
     if (insights) return;
     setInsightsLoading(true);
     setInsightsError(false);
     try {
-      const res = await fetch("/api/gstsantos/insights");
+      const url =
+        "/api/gstsantos/insights" +
+        (unitFilter !== "all" ? `?unitId=${unitFilter}` : "");
+      const res = await fetch(url);
       if (res.ok) {
         setInsights(await res.json());
       } else {
@@ -180,7 +192,7 @@ export default function FinancialPage() {
       setInsightsError(true);
     }
     setInsightsLoading(false);
-  }, [insights]);
+  }, [insights, unitFilter]);
 
   useEffect(() => {
     if (
@@ -194,6 +206,11 @@ export default function FinancialPage() {
   useEffect(() => {
     if (!isOwner) return;
     void (async () => {
+      const uRes = await fetch("/api/gstsantos/units");
+      if (uRes.ok) {
+        const rows = (await uRes.json()) as Array<{ id: string; name: string }>;
+        setUnits(rows.map((u) => ({ id: u.id, name: u.name })));
+      }
       const res = await fetch("/api/gstsantos/barbers");
       if (res.ok) {
         const rows = (await res.json()) as Array<{
@@ -224,6 +241,7 @@ export default function FinancialPage() {
         date: expForm.date,
         isRecurring: expForm.isRecurring,
         attributedToUserId: expForm.attributedToUserId || null,
+        unitId: expForm.unitId || null,
       }),
     });
     setSavingExpense(false);
@@ -236,6 +254,7 @@ export default function FinancialPage() {
         date: new Date().toISOString().slice(0, 10),
         isRecurring: false,
         attributedToUserId: "",
+        unitId: "",
       });
       await fetchData();
       // Re-fetch insights since cost allocation may have changed
@@ -368,7 +387,7 @@ export default function FinancialPage() {
       </div>
 
       {/* Tabs */}
-      <div className="gst-tabs" style={{ marginBottom: 20 }}>
+      <div className="gst-tabs" style={{ marginBottom: units.length > 1 ? 10 : 20 }}>
         {TABS.filter((t) => !t.ownerOnly || isOwner).map((t) => (
           <button
             key={t.key}
@@ -379,6 +398,27 @@ export default function FinancialPage() {
           </button>
         ))}
       </div>
+
+      {/* Filtro por unidade — owner com mais de uma filial */}
+      {isOwner && units.length > 1 && (
+        <div className="gst-tabs" style={{ marginBottom: 20, flexWrap: "wrap" }}>
+          <button
+            onClick={() => setUnitFilter("all")}
+            className={`gst-tab${unitFilter === "all" ? " on" : ""}`}
+          >
+            Consolidado
+          </button>
+          {units.map((u) => (
+            <button
+              key={u.id}
+              onClick={() => setUnitFilter(u.id)}
+              className={`gst-tab${unitFilter === u.id ? " on" : ""}`}
+            >
+              {u.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {loading || !data ? (
         <div style={{ display: "grid", gap: 12 }}>
@@ -890,6 +930,26 @@ export default function FinancialPage() {
                   Sem atribuição, o custo é rateado igualmente entre cadeiras ativas.
                 </p>
               </div>
+
+              {units.length > 1 && (
+                <div>
+                  <label style={modalLabel}>Unidade</label>
+                  <select
+                    value={expForm.unitId}
+                    onChange={(e) =>
+                      setExpForm((f) => ({ ...f, unitId: e.target.value }))
+                    }
+                    style={modalInput}
+                  >
+                    <option value="">— Geral (todas as unidades) —</option>
+                    {units.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <label
                 style={{

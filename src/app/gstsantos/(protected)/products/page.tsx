@@ -10,6 +10,7 @@ interface Product {
   costPrice: string;
   stockQuantity: number;
   isActive: boolean;
+  unitId: string | null;
 }
 
 const fmtPrice = (p: string) => `R$ ${parseFloat(p).toFixed(2).replace(".", ",")}`;
@@ -19,14 +20,17 @@ interface FormState {
   price: string;
   costPrice: string;
   stockQuantity: string;
+  unitId: string;
 }
 
-const EMPTY_FORM: FormState = { name: "", price: "", costPrice: "", stockQuantity: "0" };
+const EMPTY_FORM: FormState = { name: "", price: "", costPrice: "", stockQuantity: "0", unitId: "" };
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOwner, setIsOwner] = useState(true);
+  const [units, setUnits] = useState<{ id: string; name: string }[]>([]);
+  const [unitFilter, setUnitFilter] = useState<string>("all");
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -35,21 +39,32 @@ export default function ProductsPage() {
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/gstsantos/products?all=1");
+    const url =
+      "/api/gstsantos/products?all=1" +
+      (unitFilter !== "all" ? `&unitId=${unitFilter}` : "");
+    const res = await fetch(url);
     if (res.ok) setProducts(await res.json());
     setLoading(false);
-  }, []);
+  }, [unitFilter]);
 
   useEffect(() => {
     void fetchProducts();
+  }, [fetchProducts]);
+
+  useEffect(() => {
     void (async () => {
       const res = await fetch("/api/gstsantos/me");
       if (res.ok) {
         const me = await res.json();
         setIsOwner(me.role === "owner");
       }
+      const uRes = await fetch("/api/gstsantos/units");
+      if (uRes.ok) {
+        const rows = (await uRes.json()) as Array<{ id: string; name: string }>;
+        setUnits(rows.map((u) => ({ id: u.id, name: u.name })));
+      }
     })();
-  }, [fetchProducts]);
+  }, []);
 
   function openCreate() {
     setEditing(null);
@@ -65,6 +80,7 @@ export default function ProductsPage() {
       price: parseFloat(p.price).toFixed(2),
       costPrice: parseFloat(p.costPrice).toFixed(2),
       stockQuantity: String(p.stockQuantity),
+      unitId: p.unitId ?? "",
     });
     setError(null);
     setModalOpen(true);
@@ -82,7 +98,13 @@ export default function ProductsPage() {
     setSaving(true);
     setError(null);
 
-    const payload = { name: form.name.trim(), price, costPrice: isNaN(costPrice) ? 0 : costPrice, stockQuantity };
+    const payload = {
+      name: form.name.trim(),
+      price,
+      costPrice: isNaN(costPrice) ? 0 : costPrice,
+      stockQuantity,
+      unitId: form.unitId || null,
+    };
     const res = editing
       ? await fetch(`/api/gstsantos/products/${editing.id}`, {
           method: "PATCH",
@@ -137,6 +159,27 @@ export default function ProductsPage() {
         </button>
       </div>
 
+      {/* Filtro por unidade */}
+      {units.length > 1 && (
+        <div className="gst-tabs" style={{ marginBottom: 16, flexWrap: "wrap" }}>
+          <button
+            onClick={() => setUnitFilter("all")}
+            className={`gst-tab${unitFilter === "all" ? " on" : ""}`}
+          >
+            Todas as unidades
+          </button>
+          {units.map((u) => (
+            <button
+              key={u.id}
+              onClick={() => setUnitFilter(u.id)}
+              className={`gst-tab${unitFilter === u.id ? " on" : ""}`}
+            >
+              {u.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       {loading ? (
         <div style={{ display: "grid", gap: 10 }}>
           <div className="gst-skel" style={{ height: 72 }} />
@@ -187,6 +230,14 @@ export default function ProductsPage() {
                   </p>
                   <p style={{ margin: 0, color: "#8A847A", fontSize: 12 }}>
                     Custo {fmtPrice(p.costPrice)} · Margem {margin}%
+                    {units.length > 1 && (
+                      <>
+                        {" · "}
+                        {p.unitId
+                          ? units.find((u) => u.id === p.unitId)?.name ?? "Unidade"
+                          : "Todas as unidades"}
+                      </>
+                    )}
                   </p>
                 </div>
 
@@ -333,6 +384,23 @@ export default function ProductsPage() {
                 style={inputStyle}
               />
             </Field>
+
+            {units.length > 1 && (
+              <Field label="Unidade">
+                <select
+                  value={form.unitId}
+                  onChange={(e) => setForm((f) => ({ ...f, unitId: e.target.value }))}
+                  style={inputStyle}
+                >
+                  <option value="">Todas as unidades</option>
+                  {units.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
 
             {error && (
               <p style={{ color: "#E57373", fontSize: 13, margin: "0 0 14px" }}>{error}</p>

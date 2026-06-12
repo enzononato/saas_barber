@@ -455,6 +455,32 @@ Módulo robusto de Business Intelligence dentro do `/gstsantos/financial`, organ
 ### Bugs conhecidos não resolvidos
 - **`canCreateServices` permite gerenciar barbers**: flag ainda se chama `canCreateServices` no DB — semântica confusa, mas funcional. UI já exibe como "Barbeiro Admin". Renomear coluna no banco é trabalho futuro sem urgência.
 
+### FASE 11 — Multi-unidade (filiais) · `✅ CONCLUÍDA` (3 sub-fases)
+
+**Sub-fase 1 — Fundação + Mapa (commit "Fase 1"):**
+- [x] Schema: `units`, `member_units` (N:N barbeiro↔unidade), `service_units` (preço por unidade); `unit_id` nullable em `appointments`, `working_hours`, `time_exceptions`, `expenses`, `products`
+- [x] Migration manual idempotente `0011_units_multi_unit.sql` + script `npm run db:backfill-units` (cria "Matriz" e vincula dados existentes; idempotente)
+- [x] CRUD de unidades em /gstsantos/units — dono cola link do Google Maps (`maps.app.goo.gl`), sistema resolve lat/lng (`src/server/services/google-maps.ts`)
+- [x] Mapa real MapLibre GL (basemap Carto dark, sem API key) na página pública, multi-pin com popups
+
+**Sub-fase 2 — Operação por unidade (commit "Fase 2"):**
+- [x] Equipe: atribuição barbeiro↔unidades (modal em /gstsantos/barbers)
+- [x] Serviços: preço por unidade (inputs por filial no modal)
+- [x] Horários (`working_hours`) escopados por unidade; conflito de agenda do barbeiro continua GLOBAL (não se divide entre filiais)
+- [x] Booking público: cliente escolhe a filial antes do wizard; serviços/barbeiros/preços/slots filtrados por unidade
+- [x] Agenda do painel: filtro por unidade + seletor no agendamento manual
+
+**Sub-fase 3 — Dados por unidade + correções (este commit):**
+- [x] **Bugfix modais cortados no topo**: `animation-fill-mode: both` em `.gst-page`/`.gst-stagger` mantinha animação de transform "aplicada" para sempre → containing block permanente → `position: fixed` dos modais relativo ao container. Trocado para `backwards`. Mesmo problema em `.rv` (página pública): `will-change: transform` permanente → adicionado `will-change: auto` em `.rv.in`
+- [x] /financeiro: filtro por unidade (tabs "Consolidado" + filiais) em todas as abas — Visão Geral, Carteira, Ranking, Simulação (`?unitId=` em /financial e /insights)
+- [x] /insights: todas as 10 queries aceitam `unitId`; carteira/fidelização por unidade derivam `last_seen` dos próprios appointments da filial (tabela `customers` é global)
+- [x] Despesas: campo "Unidade" no modal (null = geral/rateada em todas); filtradas no financeiro por filial
+- [x] Produtos: campo "Unidade" no cadastro/edição + filtro por filial na página
+- [x] Página pública: link do Google Maps colado pelo dono agora é o destino do "Ir →" (lista de unidades), do "Como chegar →" (popup do mapa) e do novo "Ver no Google Maps →" (unidade única)
+- [x] Validação: tsc 0 erros · build OK · queries SQL testadas em Postgres real (incl. fragmento vazio do consolidado)
+
+**Deploy:** migração 0011 JÁ APLICADA em produção (12/06/2026). Falta: `git push` → rebuild EasyPanel → `npm run db:backfill-units` no container.
+
 ---
 
 ## Decisões Tomadas (não reabrir sem motivo)

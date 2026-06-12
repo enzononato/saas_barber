@@ -65,7 +65,7 @@ export function LocationMap({ units, activeId, onSelect }: LocationMapProps) {
         <div class="gst-map-popup">
           <strong>${escapeHtml(u.name)}</strong>
           ${u.address ? `<span>${escapeHtml(u.address)}</span>` : ""}
-          <a href="https://www.google.com/maps/dir/?api=1&destination=${u.lat},${u.lng}" target="_blank" rel="noopener noreferrer">Como chegar →</a>
+          <a href="${escapeHtml(u.googleMapsUrl ?? `https://www.google.com/maps/dir/?api=1&destination=${u.lat},${u.lng}`)}" target="_blank" rel="noopener noreferrer">Como chegar →</a>
         </div>`;
       const popup = new maplibregl.Popup({ offset: 18, closeButton: false }).setHTML(popupHtml);
 

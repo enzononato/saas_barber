@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { db } from "@/server/db";
 import { appointmentProducts, products } from "@/server/db/schema/products";
+import { units } from "@/server/db/schema/units";
 import { requireAuth } from "@/server/middleware/requireAuth";
 
 const patchSchema = z.object({
@@ -12,6 +13,7 @@ const patchSchema = z.object({
   costPrice: z.number().min(0).max(999999).optional(),
   stockQuantity: z.number().int().min(0).max(999999).optional(),
   isActive: z.boolean().optional(),
+  unitId: z.string().uuid().nullable().optional(),
 });
 
 export async function PATCH(
@@ -40,6 +42,17 @@ export async function PATCH(
   }
 
   const d = parsed.data;
+
+  // unitId (quando informado) precisa pertencer à org
+  if (d.unitId) {
+    const [u] = await db
+      .select({ id: units.id })
+      .from(units)
+      .where(and(eq(units.id, d.unitId), eq(units.organizationId, ctx.orgId)))
+      .limit(1);
+    if (!u) return NextResponse.json({ error: "unit_not_found" }, { status: 404 });
+  }
+
   const [updated] = await db
     .update(products)
     .set({
@@ -48,6 +61,7 @@ export async function PATCH(
       ...(d.costPrice !== undefined && { costPrice: d.costPrice.toFixed(2) }),
       ...(d.stockQuantity !== undefined && { stockQuantity: d.stockQuantity }),
       ...(d.isActive !== undefined && { isActive: d.isActive }),
+      ...(d.unitId !== undefined && { unitId: d.unitId }),
     })
     .where(and(eq(products.id, id), eq(products.organizationId, ctx.orgId)))
     .returning({ id: products.id });

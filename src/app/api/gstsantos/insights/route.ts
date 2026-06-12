@@ -66,12 +66,18 @@ interface AvgDurationRow {
   avg_minutes: string;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const ctx = await requireAuth();
   if (!ctx) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   if (ctx.role !== "owner") return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
   const orgId = ctx.orgId;
+  const { searchParams } = new URL(req.url);
+  const unitId = searchParams.get("unitId"); // filtra todas as métricas por filial
+
+  // Fragmentos opcionais de filtro por unidade (noop quando sem filtro)
+  const unitCond = unitId ? sql` AND unit_id = ${unitId}` : sql``;
+  const unitCondA = unitId ? sql` AND a.unit_id = ${unitId}` : sql``;
 
   const [
     walletRes,
@@ -85,16 +91,33 @@ export async function GET() {
     workingHoursRes,
     avgDurationRes,
   ] = await Promise.all([
-    // 1. Wallet status
-    db.execute(sql`
-      SELECT
-        COUNT(*) FILTER (WHERE last_seen_at >= NOW() - INTERVAL '30 days')::int AS active,
-        COUNT(*) FILTER (WHERE last_seen_at >= NOW() - INTERVAL '60 days' AND last_seen_at < NOW() - INTERVAL '30 days')::int AS retention,
-        COUNT(*) FILTER (WHERE last_seen_at >= NOW() - INTERVAL '90 days' AND last_seen_at < NOW() - INTERVAL '60 days')::int AS at_risk,
-        COUNT(*) FILTER (WHERE last_seen_at < NOW() - INTERVAL '90 days')::int AS lost,
-        COUNT(*)::int AS total
-      FROM customers WHERE organization_id = ${orgId}
-    `),
+    // 1. Wallet status — com filtro de unidade, deriva o "último atendimento"
+    // dos próprios appointments da filial (customers é global da org)
+    unitId
+      ? db.execute(sql`
+          WITH per AS (
+            SELECT customer_phone, MAX(starts_at) AS last_seen_at
+            FROM appointments
+            WHERE organization_id = ${orgId} AND status = 'COMPLETED' AND unit_id = ${unitId}
+            GROUP BY customer_phone
+          )
+          SELECT
+            COUNT(*) FILTER (WHERE last_seen_at >= NOW() - INTERVAL '30 days')::int AS active,
+            COUNT(*) FILTER (WHERE last_seen_at >= NOW() - INTERVAL '60 days' AND last_seen_at < NOW() - INTERVAL '30 days')::int AS retention,
+            COUNT(*) FILTER (WHERE last_seen_at >= NOW() - INTERVAL '90 days' AND last_seen_at < NOW() - INTERVAL '60 days')::int AS at_risk,
+            COUNT(*) FILTER (WHERE last_seen_at < NOW() - INTERVAL '90 days')::int AS lost,
+            COUNT(*)::int AS total
+          FROM per
+        `)
+      : db.execute(sql`
+          SELECT
+            COUNT(*) FILTER (WHERE last_seen_at >= NOW() - INTERVAL '30 days')::int AS active,
+            COUNT(*) FILTER (WHERE last_seen_at >= NOW() - INTERVAL '60 days' AND last_seen_at < NOW() - INTERVAL '30 days')::int AS retention,
+            COUNT(*) FILTER (WHERE last_seen_at >= NOW() - INTERVAL '90 days' AND last_seen_at < NOW() - INTERVAL '60 days')::int AS at_risk,
+            COUNT(*) FILTER (WHERE last_seen_at < NOW() - INTERVAL '90 days')::int AS lost,
+            COUNT(*)::int AS total
+          FROM customers WHERE organization_id = ${orgId}
+        `),
 
     // 2. LTV
     db.execute(sql`
@@ -105,28 +128,22 @@ export async function GET() {
         MIN(starts_at) AS first_visit,
         MAX(starts_at) AS last_visit
       FROM appointments
-      WHERE organization_id = ${orgId} AND status = 'COMPLETED'
+      WHERE organization_id = ${orgId} AND status = 'COMPLETED'${unitCond}
     `),
 
-    // 3. Retention / Loyalty
+    // 3. Retention / Loyalty (last_seen vem dos próprios appointments do escopo)
     db.execute(sql`
       WITH visits AS (
-        SELECT customer_phone, COUNT(*) AS n
+        SELECT customer_phone, COUNT(*) AS n, MAX(starts_at) AS last_seen_at
         FROM appointments
-        WHERE organization_id = ${orgId} AND status = 'COMPLETED'
+        WHERE organization_id = ${orgId} AND status = 'COMPLETED'${unitCond}
         GROUP BY customer_phone
       )
       SELECT
         COUNT(*) FILTER (WHERE v.n >= 2)::int AS clients_with_second,
         COUNT(*) FILTER (WHERE v.n >= 5)::int AS loyal_total,
         COUNT(*) FILTER (
-          WHERE v.n >= 5
-            AND EXISTS (
-              SELECT 1 FROM customers c
-              WHERE c.organization_id = ${orgId}
-                AND c.phone = v.customer_phone
-                AND c.last_seen_at >= NOW() - INTERVAL '30 days'
-            )
+          WHERE v.n >= 5 AND v.last_seen_at >= NOW() - INTERVAL '30 days'
         )::int AS loyal_active,
         COUNT(*)::int AS clients_total
       FROM visits v
@@ -140,14 +157,14 @@ export async function GET() {
         WHERE organization_id = ${orgId}
           AND status = 'COMPLETED'
           AND starts_at >= NOW() - INTERVAL '60 days'
-          AND starts_at < NOW() - INTERVAL '30 days'
+          AND starts_at < NOW() - INTERVAL '30 days'${unitCond}
       ),
       curr AS (
         SELECT DISTINCT customer_phone
         FROM appointments
         WHERE organization_id = ${orgId}
           AND status = 'COMPLETED'
-          AND starts_at >= NOW() - INTERVAL '30 days'
+          AND starts_at >= NOW() - INTERVAL '30 days'${unitCond}
       )
       SELECT
         (SELECT COUNT(*)::int FROM prev WHERE customer_phone IN (SELECT customer_phone FROM curr)) AS returned,
@@ -165,7 +182,7 @@ export async function GET() {
       FROM appointments a
       INNER JOIN "user" u ON u.id = a.professional_id
       WHERE a.organization_id = ${orgId}
-        AND a.starts_at >= NOW() - INTERVAL '30 days'
+        AND a.starts_at >= NOW() - INTERVAL '30 days'${unitCondA}
       GROUP BY u.id, u.name
       HAVING COUNT(*) FILTER (WHERE a.status = 'COMPLETED') > 0
          OR COUNT(*) FILTER (WHERE a.status IN ('NO_SHOW', 'CANCELED')) > 0
@@ -183,7 +200,7 @@ export async function GET() {
       LEFT JOIN barber_services bs ON bs.member_id = m.id AND bs.service_id = a.service_id
       WHERE a.organization_id = ${orgId}
         AND a.status = 'COMPLETED'
-        AND a.starts_at >= NOW() - INTERVAL '30 days'
+        AND a.starts_at >= NOW() - INTERVAL '30 days'${unitCondA}
       GROUP BY u.id
     `),
 
@@ -194,7 +211,7 @@ export async function GET() {
         COALESCE(SUM(amount), 0)::text AS total
       FROM expenses
       WHERE organization_id = ${orgId}
-        AND date >= (CURRENT_DATE - INTERVAL '30 days')
+        AND date >= (CURRENT_DATE - INTERVAL '30 days')${unitCond}
       GROUP BY attributed_to_user_id
     `),
 
@@ -207,7 +224,7 @@ export async function GET() {
       WHERE organization_id = ${orgId}
         AND status = 'COMPLETED'
         AND starts_at >= DATE_TRUNC('month', NOW() - INTERVAL '3 months')
-        AND starts_at < DATE_TRUNC('month', NOW() + INTERVAL '1 month')
+        AND starts_at < DATE_TRUNC('month', NOW() + INTERVAL '1 month')${unitCond}
       GROUP BY month
       ORDER BY month
     `),
@@ -223,7 +240,7 @@ export async function GET() {
       FROM working_hours wh
       INNER JOIN member m ON m."userId" = wh.professional_id AND m."organizationId" = wh.organization_id
       WHERE wh.organization_id = ${orgId}
-        AND m.is_barber = true
+        AND m.is_barber = true${unitId ? sql` AND wh.unit_id = ${unitId}` : sql``}
     `),
 
     // 10. Average service duration per barber (from completed appointments + their attached services)
@@ -235,7 +252,7 @@ export async function GET() {
       INNER JOIN services s ON s.id = a.service_id
       WHERE a.organization_id = ${orgId}
         AND a.status = 'COMPLETED'
-        AND a.starts_at >= NOW() - INTERVAL '30 days'
+        AND a.starts_at >= NOW() - INTERVAL '30 days'${unitCondA}
       GROUP BY a.professional_id
     `),
   ]);

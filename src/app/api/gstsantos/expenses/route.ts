@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { db } from "@/server/db";
 import { expenses } from "@/server/db/schema/expenses";
+import { units } from "@/server/db/schema/units";
 import { requireAuth } from "@/server/middleware/requireAuth";
 
 export async function GET(req: Request) {
@@ -42,13 +43,14 @@ export async function POST(req: Request) {
   if (ctx.role !== "owner") return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
   const body = await req.json();
-  const { description, category, amount, date, isRecurring, attributedToUserId } = body as {
+  const { description, category, amount, date, isRecurring, attributedToUserId, unitId } = body as {
     description?: string;
     category?: string | null;
     amount?: number | string;
     date?: string;
     isRecurring?: boolean;
     attributedToUserId?: string | null;
+    unitId?: string | null;
   };
 
   if (!description || amount === undefined || amount === null || !date) {
@@ -63,10 +65,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid amount" }, { status: 400 });
   }
 
+  // unitId (opcional) precisa pertencer à org
+  let validUnitId: string | null = null;
+  if (unitId) {
+    const [u] = await db
+      .select({ id: units.id })
+      .from(units)
+      .where(and(eq(units.id, unitId), eq(units.organizationId, ctx.orgId)))
+      .limit(1);
+    if (!u) return NextResponse.json({ error: "unit_not_found" }, { status: 404 });
+    validUnitId = u.id;
+  }
+
   const [created] = await db
     .insert(expenses)
     .values({
       organizationId: ctx.orgId,
+      unitId: validUnitId,
       description,
       category: category && category.trim() ? category.trim() : null,
       amount: amountNum.toFixed(2),

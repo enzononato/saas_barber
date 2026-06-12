@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { db } from "@/server/db";
 import { products } from "@/server/db/schema/products";
+import { units } from "@/server/db/schema/units";
 import { requireAuth } from "@/server/middleware/requireAuth";
 
 const createSchema = z.object({
@@ -11,6 +12,7 @@ const createSchema = z.object({
   price: z.number().min(0).max(999999),
   costPrice: z.number().min(0).max(999999).optional().default(0),
   stockQuantity: z.number().int().min(0).max(999999).optional().default(0),
+  unitId: z.string().uuid().nullable().optional(),
 });
 
 // Lista produtos. Qualquer membro autenticado pode listar (necessário para o
@@ -21,9 +23,11 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const includeInactive = searchParams.get("all") === "1" && ctx.role === "owner";
+  const unitId = searchParams.get("unitId"); // filtra por filial (opcional)
 
   const conditions = [eq(products.organizationId, ctx.orgId)];
   if (!includeInactive) conditions.push(eq(products.isActive, true));
+  if (unitId) conditions.push(eq(products.unitId, unitId));
 
   const rows = await db
     .select({
@@ -33,6 +37,7 @@ export async function GET(req: Request) {
       costPrice: products.costPrice,
       stockQuantity: products.stockQuantity,
       isActive: products.isActive,
+      unitId: products.unitId,
     })
     .from(products)
     .where(and(...conditions))
@@ -61,10 +66,23 @@ export async function POST(req: Request) {
     );
   }
 
+  // unitId (opcional) precisa pertencer à org
+  let validUnitId: string | null = null;
+  if (parsed.data.unitId) {
+    const [u] = await db
+      .select({ id: units.id })
+      .from(units)
+      .where(and(eq(units.id, parsed.data.unitId), eq(units.organizationId, ctx.orgId)))
+      .limit(1);
+    if (!u) return NextResponse.json({ error: "unit_not_found" }, { status: 404 });
+    validUnitId = u.id;
+  }
+
   const [created] = await db
     .insert(products)
     .values({
       organizationId: ctx.orgId,
+      unitId: validUnitId,
       name: parsed.data.name,
       price: parsed.data.price.toFixed(2),
       costPrice: parsed.data.costPrice.toFixed(2),

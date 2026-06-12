@@ -46,6 +46,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const period = searchParams.get("period") ?? "month"; // day | week | month
   const date = searchParams.get("date") ?? new Date().toISOString().slice(0, 10);
+  const unitId = searchParams.get("unitId"); // filtra por filial (opcional)
 
   const { start, end } = getPeriodRange(period, date);
 
@@ -55,6 +56,10 @@ export async function GET(req: Request) {
     gte(appointments.startsAt, start),
     lte(appointments.startsAt, end),
   ];
+
+  if (unitId) {
+    conditions.push(eq(appointments.unitId, unitId));
+  }
 
   if (ctx.role === "member") {
     conditions.push(eq(appointments.professionalId, ctx.userId));
@@ -154,6 +159,10 @@ export async function GET(req: Request) {
       gte(expenses.date, fromDate),
       lte(expenses.date, toDate),
     ];
+
+    if (unitId) {
+      expenseConditions.push(eq(expenses.unitId, unitId));
+    }
 
     const [expTotals] = await db
       .select({
