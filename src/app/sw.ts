@@ -1,6 +1,6 @@
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { Serwist } from "serwist";
+import { NetworkOnly, Serwist } from "serwist";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -15,7 +15,18 @@ const serwist = new Serwist({
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
-  runtimeCaching: defaultCache,
+  runtimeCaching: [
+    // Tiles/glyphs/sprites do mapa (Carto/MapLibre) vão direto à rede.
+    // O cache cross-origin padrão do Serwist limita a 32 entradas, o que faz
+    // o mapa (dezenas de requisições) ficar em thrashing e não renderizar.
+    {
+      matcher: ({ url }) =>
+        url.hostname.endsWith("cartocdn.com") ||
+        url.hostname.endsWith("basemaps.cartocdn.com"),
+      handler: new NetworkOnly(),
+    },
+    ...defaultCache,
+  ],
 });
 
 serwist.addEventListeners();

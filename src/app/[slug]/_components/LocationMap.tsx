@@ -41,68 +41,94 @@ export function LocationMap({ units, activeId, onSelect }: LocationMapProps) {
 
   // Inicializa o mapa uma vez e plota os marcadores.
   useEffect(() => {
-    if (!containerRef.current || geo.length === 0) return;
+    const container = containerRef.current;
+    if (!container || geo.length === 0) return;
 
-    const map = new maplibregl.Map({
-      container: containerRef.current,
-      style: DARK_STYLE,
-      center: [geo[0].lng, geo[0].lat],
-      zoom: 14,
-      attributionControl: { compact: true },
-      pitchWithRotate: false,
-      dragRotate: false,
-    });
-    mapRef.current = map;
+    let map: maplibregl.Map | null = null;
+    let cancelled = false;
+    let raf = 0;
 
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
-    map.resize();
+    // Cria o mapa só quando o container já tem dimensões reais.
+    // Sem isso o MapLibre inicializa com 0×0 e nunca desenha (tela preta).
+    const init = () => {
+      if (cancelled) return;
+      if (container.clientWidth === 0 || container.clientHeight === 0) {
+        raf = requestAnimationFrame(init);
+        return;
+      }
 
-    for (const u of geo) {
-      // Wrapper: dot em cima + label em baixo (âncora no topo do wrapper)
-      const el = document.createElement("div");
-      el.className = "gst-map-pin-wrap";
-      el.setAttribute("data-unit", u.id);
+      map = new maplibregl.Map({
+        container,
+        style: DARK_STYLE,
+        center: [geo[0].lng, geo[0].lat],
+        zoom: 14,
+        attributionControl: { compact: true },
+        pitchWithRotate: false,
+        dragRotate: false,
+      });
+      mapRef.current = map;
 
-      const dot = document.createElement("div");
-      dot.className = "gst-map-pin";
-      el.appendChild(dot);
+      map.on("error", (e) => {
+        // Surfaces falhas de fetch do estilo/tiles (ex.: bloqueio do service worker).
+        console.error("[LocationMap] maplibre error:", e?.error ?? e);
+      });
 
-      const labelEl = document.createElement("div");
-      labelEl.className = "gst-map-pin-label";
-      labelEl.textContent = u.name;
-      el.appendChild(labelEl);
+      map.addControl(
+        new maplibregl.NavigationControl({ showCompass: false }),
+        "bottom-right",
+      );
 
-      const popupHtml = `
-        <div class="gst-map-popup">
-          ${u.address ? `<span>${escapeHtml(u.address)}</span>` : ""}
-          <a href="${escapeHtml(u.googleMapsUrl ?? `https://www.google.com/maps/dir/?api=1&destination=${u.lat},${u.lng}`)}" target="_blank" rel="noopener noreferrer">Como chegar →</a>
-        </div>`;
-      const popup = new maplibregl.Popup({ offset: 30, closeButton: false }).setHTML(popupHtml);
+      for (const u of geo) {
+        // Wrapper: dot em cima + label em baixo (âncora no topo do wrapper)
+        const el = document.createElement("div");
+        el.className = "gst-map-pin-wrap";
+        el.setAttribute("data-unit", u.id);
 
-      const marker = new maplibregl.Marker({ element: el, anchor: "top" })
-        .setLngLat([u.lng, u.lat])
-        .setPopup(popup)
-        .addTo(map);
+        const dot = document.createElement("div");
+        dot.className = "gst-map-pin";
+        el.appendChild(dot);
 
-      dot.addEventListener("click", () => onSelectRef.current?.(u.id));
-      markersRef.current.set(u.id, marker);
-    }
+        const labelEl = document.createElement("div");
+        labelEl.className = "gst-map-pin-label";
+        labelEl.textContent = u.name;
+        el.appendChild(labelEl);
 
-    // Enquadra todas as unidades.
-    if (geo.length === 1) {
-      map.setCenter([geo[0].lng, geo[0].lat]);
-      map.setZoom(15);
-    } else {
-      const bounds = new maplibregl.LngLatBounds();
-      geo.forEach((u) => bounds.extend([u.lng, u.lat]));
-      map.fitBounds(bounds, { padding: 60, maxZoom: 15, duration: 0 });
-    }
+        const popupHtml = `
+          <div class="gst-map-popup">
+            ${u.address ? `<span>${escapeHtml(u.address)}</span>` : ""}
+            <a href="${escapeHtml(u.googleMapsUrl ?? `https://www.google.com/maps/dir/?api=1&destination=${u.lat},${u.lng}`)}" target="_blank" rel="noopener noreferrer">Como chegar →</a>
+          </div>`;
+        const popup = new maplibregl.Popup({ offset: 30, closeButton: false }).setHTML(popupHtml);
 
-    map.on("load", () => map.resize());
+        const marker = new maplibregl.Marker({ element: el, anchor: "top" })
+          .setLngLat([u.lng, u.lat])
+          .setPopup(popup)
+          .addTo(map);
+
+        dot.addEventListener("click", () => onSelectRef.current?.(u.id));
+        markersRef.current.set(u.id, marker);
+      }
+
+      // Enquadra todas as unidades.
+      if (geo.length === 1) {
+        map.setCenter([geo[0].lng, geo[0].lat]);
+        map.setZoom(15);
+      } else {
+        const bounds = new maplibregl.LngLatBounds();
+        geo.forEach((u) => bounds.extend([u.lng, u.lat]));
+        map.fitBounds(bounds, { padding: 60, maxZoom: 15, duration: 0 });
+      }
+
+      map.on("load", () => map?.resize());
+    };
+
+    init();
 
     return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
       markersRef.current.clear();
-      map.remove();
+      map?.remove();
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
