@@ -723,7 +723,8 @@ section.block + section.block { border-top: 1px solid rgba(201,168,76,0.10); }
   overflow: hidden;
   background: var(--ink-2);
 }
-.gst-map-canvas { position: absolute; inset: 0; }
+.gst-map-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.gst-map-canvas .maplibregl-map { width: 100%; height: 100%; }
 /* leve overlay dourado pra integrar o mapa ao tema da página */
 .gst-map::after {
   content: "";

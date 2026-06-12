@@ -23,7 +23,7 @@ interface LocationMapProps {
 }
 
 // Marcador de versão do código — confirma que o novo build está rodando.
-const BUILD_TAG = "map-diag-v4";
+const BUILD_TAG = "map-diag-v5";
 
 // Basemap dark gratuito do Carto — não exige API key.
 const DARK_STYLE =
@@ -33,6 +33,7 @@ export function LocationMap({ units, activeId, onSelect }: LocationMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<Map<string, maplibregl.Marker>>(new Map());
+  const roRef = useRef<ResizeObserver | null>(null);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
 
@@ -102,12 +103,33 @@ export function LocationMap({ units, activeId, onSelect }: LocationMapProps) {
       });
 
       map.on("load", () => {
-        log(`style carregado ✓`);
-        map?.resize();
-        setReady(true);
+        const m = map;
+        if (!m) return;
+        m.resize();
+        const c = m.getCanvas();
+        log(`style ✓ · buffer ${c.width}×${c.height} · cont ${container.clientWidth}×${container.clientHeight}`);
+        // Resizes adiados cobrem o fim da animação de reveal (transform/opacity),
+        // que pode deixar o canvas WebGL preto se medido cedo demais.
+        const bump = (ms: number) =>
+          window.setTimeout(() => {
+            if (cancelled || !mapRef.current) return;
+            mapRef.current.resize();
+            mapRef.current.triggerRepaint();
+          }, ms);
+        bump(150);
+        bump(450);
+        bump(900);
+        // Mantém o painel visível ~2.5s pós-load para leitura do diagnóstico.
+        window.setTimeout(() => !cancelled && setReady(true), 2500);
       });
 
-      map.on("styledata", () => log(`styledata`));
+      // Repinta sempre que o container muda de tamanho (reveal, resize de janela).
+      const ro = new ResizeObserver(() => {
+        if (cancelled || !mapRef.current) return;
+        mapRef.current.resize();
+      });
+      ro.observe(container);
+      roRef.current = ro;
 
       map.addControl(
         new maplibregl.NavigationControl({ showCompass: false }),
@@ -162,6 +184,8 @@ export function LocationMap({ units, activeId, onSelect }: LocationMapProps) {
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);
+      roRef.current?.disconnect();
+      roRef.current = null;
       markersRef.current.clear();
       map?.remove();
       mapRef.current = null;
